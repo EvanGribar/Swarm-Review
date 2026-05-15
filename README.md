@@ -144,7 +144,7 @@ principal: blocking until this path uses parameterized queries.
 
 ### Config fields
 
-- Exact env references (for example `apiKey: $ANTHROPIC_API_KEY`) are resolved from the runtime environment before schema validation. Missing referenced variables fail the run with a clear error.
+- Exact env references (values that are exactly `$ENV_VAR_NAME`, with no interpolation) are resolved from the runtime environment before schema validation. Missing referenced variables fail the run with a clear error.
 - `provider`: optional LLM provider configuration (see Provider Configuration below).
 - `agents`: list of reviewer agents, each with a `name`, `mandate`, and optional `model`.
 - `debate.rounds`: how many debate rounds to run after the first-pass review.

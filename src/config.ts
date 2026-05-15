@@ -18,8 +18,10 @@ export const DEFAULT_SWARM_CONFIG: SwarmConfig = SwarmConfigSchema.parse({
   output: { mode: "outcome" },
 });
 
+const ENV_VAR_REFERENCE_PATTERN = /^\$([A-Za-z_][A-Za-z0-9_]*)$/;
+
 function resolveEnvReference(value: string, pathLabel: string): string {
-  const match = /^\$([A-Za-z_][A-Za-z0-9_]*)$/.exec(value);
+  const match = ENV_VAR_REFERENCE_PATTERN.exec(value);
   if (!match) {
     return value;
   }

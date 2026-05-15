@@ -43,6 +43,23 @@ function resolveRepository(): { owner: string; repo: string } {
   return { owner, repo };
 }
 
+function applyAnthropicEndpointOverride(
+  config: ProviderConfig & { type: "anthropic" },
+  apiEndpointOverride?: string
+): ProviderConfig & { type: "anthropic" } {
+  if (!apiEndpointOverride) {
+    return config;
+  }
+
+  return {
+    type: "anthropic",
+    config: {
+      ...config.config,
+      baseURL: apiEndpointOverride,
+    },
+  };
+}
+
 async function writeActionOutput(name: string, value: string): Promise<void> {
   const outputPath = process.env.GITHUB_OUTPUT;
   if (!outputPath) {
@@ -105,27 +122,29 @@ async function main(): Promise<void> {
     // If config has provider but no API key, try to inject from environment
     if (!swarmConfig.provider.config.apiKey) {
       if (swarmConfig.provider.type === "anthropic" && anthropicApiKey) {
-        providerConfig = {
-          type: "anthropic",
-          config: {
-            ...swarmConfig.provider.config,
-            apiKey: anthropicApiKey,
-            ...(apiEndpointOverride ? { baseURL: apiEndpointOverride } : {}),
+        providerConfig = applyAnthropicEndpointOverride(
+          {
+            type: "anthropic",
+            config: {
+              ...swarmConfig.provider.config,
+              apiKey: anthropicApiKey,
+            },
           },
-        };
+          apiEndpointOverride
+        );
       } else {
         throw new Error(`Provider API key is required for ${swarmConfig.provider.type}.`);
       }
     } else {
       providerConfig =
         swarmConfig.provider.type === "anthropic"
-          ? {
-              type: "anthropic",
-              config: {
-                ...swarmConfig.provider.config,
-                ...(apiEndpointOverride ? { baseURL: apiEndpointOverride } : {}),
+          ? applyAnthropicEndpointOverride(
+              {
+                type: "anthropic",
+                config: { ...swarmConfig.provider.config },
               },
-            }
+              apiEndpointOverride
+            )
           : swarmConfig.provider;
     }
   } else {
@@ -133,14 +152,17 @@ async function main(): Promise<void> {
     if (!anthropicApiKey) {
       throw new Error("Anthropic API key is required (set ANTHROPIC_API_KEY or anthropic-api-key input).");
     }
-    providerConfig = {
-      type: "anthropic",
-      config: {
-        apiKey: anthropicApiKey,
-        model: anthropicModel,
-        baseURL: apiEndpointOverride ?? DEFAULT_API_ENDPOINT,
+    providerConfig = applyAnthropicEndpointOverride(
+      {
+          type: "anthropic",
+          config: {
+            apiKey: anthropicApiKey,
+            model: anthropicModel,
+            baseURL: DEFAULT_API_ENDPOINT,
+          },
       },
-    };
+      apiEndpointOverride
+    );
   }
 
   console.log(`Running swarm-review for ${owner}/${repo}#${pullNumber}`);
