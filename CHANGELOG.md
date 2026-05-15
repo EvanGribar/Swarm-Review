@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 ## [Unreleased]
 
 ### Changed
-- `.swarm.yml` now resolves exact environment references (for example `$ANTHROPIC_API_KEY`) before schema validation and fails clearly when a referenced variable is missing.
+- `.swarm.yml` now resolves exact environment references (`$ANTHROPIC_API_KEY`) before schema validation and fails clearly when a referenced variable is missing.
 - Anthropic endpoint wiring now honors the `api-endpoint` action input in both legacy Anthropic mode and `provider.type: anthropic`, while preserving `provider.config.baseURL` when no override is provided.
 - Documentation and examples updated to clarify env reference resolution and Anthropic endpoint override behavior.
 
