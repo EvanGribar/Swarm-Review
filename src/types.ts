@@ -103,70 +103,70 @@ export const ProviderTypeSchema = z.enum([
 export type ProviderType = z.infer<typeof ProviderTypeSchema>;
 
 export const AnthropicConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().default(""),
   model: z.string().min(1).default("claude-3-5-sonnet-latest"),
 });
 
 export const OpenAIConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().default(""),
   model: z.string().min(1).default("gpt-4o"),
   baseURL: z.string().url().optional(),
 });
 
 export const OpenRouterConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().default(""),
   model: z.string().min(1).default("anthropic/claude-3.5-sonnet"),
 });
 
 export const OpenClawConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().default(""),
   model: z.string().min(1).default("kimi-k2.5:cloud"),
   baseURL: z.string().url().default("http://localhost:11434/v1"),
 });
 
 export const HermesConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().default(""),
   model: z.string().min(1).default("nous-hermes-3-llama-3.1-405b"),
   baseURL: z.string().url().default("http://localhost:8080/v1"),
 });
 
 export const GroqConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().default(""),
   model: z.string().min(1).default("llama-3.3-70b-versatile"),
 });
 
 export const TogetherConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().default(""),
   model: z.string().min(1).default("meta-llama/Llama-3.3-70B-Instruct-Turbo"),
 });
 
 export const MistralConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().default(""),
   model: z.string().min(1).default("mistral-large-latest"),
 });
 
 export const CohereConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().default(""),
   model: z.string().min(1).default("command-r-plus"),
 });
 
 export const PerplexityConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().default(""),
   model: z.string().min(1).default("llama-3.1-sonar-small-128k-online"),
 });
 
 export const HyperbolicConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().default(""),
   model: z.string().min(1).default("meta-llama/Llama-3.3-70B-Instruct"),
 });
 
 export const GeminiConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().default(""),
   model: z.string().min(1).default("gemini-2.0-flash-exp"),
 });
 
 export const CustomProviderConfigSchema = z.object({
-  apiKey: z.string().min(1),
+  apiKey: z.string().default(""),
   model: z.string().min(1),
   baseURL: z.string().url(),
   headers: z.record(z.string()).optional(),

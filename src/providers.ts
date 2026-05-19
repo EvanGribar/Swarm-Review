@@ -830,7 +830,7 @@ class GeminiProvider implements LLMProvider {
   constructor(private config: GeminiConfig) {}
 
   async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = "https://generativelanguage.googleapis.com/v1beta/chat/completions";
+    const endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
     let lastError: Error | undefined;
 
     for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
@@ -840,10 +840,11 @@ class GeminiProvider implements LLMProvider {
       let retryDelayMs = 500 * 2 ** (attempt - 1);
 
       try {
-        const response = await fetch(`${endpoint}?key=${this.config.apiKey}`, {
+        const response = await fetch(endpoint, {
           method: "POST",
           headers: {
             "content-type": "application/json",
+            "authorization": `Bearer ${this.config.apiKey}`,
           },
           body: JSON.stringify({
             model: this.config.model,

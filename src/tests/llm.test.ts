@@ -55,3 +55,63 @@ test("callAnthropic throws on non-retryable status", async (t) => {
     /Anthropic request failed with 400/
   );
 });
+
+test("callLLMStructured self-heals after validation failure", async (t) => {
+  const { callLLMStructured } = await import("../llm.js");
+  const { z } = await import("zod");
+
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const schema = z.object({
+    success: z.boolean(),
+  });
+
+  let attempts = 0;
+  const promptsSent: string[] = [];
+
+  globalThis.fetch = (async (url, init) => {
+    attempts += 1;
+    const body = JSON.parse(init?.body as string);
+    // Anthropic messages structure has content array: body.messages[0].content
+    // Wait, let's look at how AnthropicProvider passes the prompt:
+    // It passes messages: [{ role: "user", content: prompt }]
+    const userPrompt = body.messages[0]?.content;
+    promptsSent.push(userPrompt);
+
+    if (attempts === 1) {
+      // First attempt returns JSON that fails validation (missing success field)
+      return new Response(
+        JSON.stringify({
+          content: [{ type: "text", text: JSON.stringify({ wrongField: true }) }],
+        }),
+        { status: 200 }
+      );
+    }
+
+    // Second attempt returns valid JSON matching the schema
+    return new Response(
+      JSON.stringify({
+        content: [{ type: "text", text: JSON.stringify({ success: true }) }],
+      }),
+      { status: 200 }
+    );
+  }) as typeof fetch;
+
+  const result = await callLLMStructured(
+    {
+      type: "anthropic",
+      config: { apiKey: "test-key", model: "claude-3-5-sonnet-latest" },
+    },
+    "system",
+    "Please return success true.",
+    schema
+  );
+
+  assert.deepEqual(result, { success: true });
+  assert.equal(attempts, 2);
+  assert.ok(promptsSent[1].includes("CRITICAL: Your previous response failed validation and could not be parsed."));
+  assert.ok(promptsSent[1].includes("wrongField"));
+});

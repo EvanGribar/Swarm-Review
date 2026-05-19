@@ -1,6 +1,6 @@
 import { buildDebatePrompt } from "../prompts.js";
 import type { AgentConfig, DebateTranscript, FileDiff, Finding, ProviderConfig, DiffConfig } from "../types.js";
-import { runAgentFindingRound } from "./shared.js";
+import { runAgentFindingRound, resolveAgentProviderConfig } from "./shared.js";
 
 export type DebateRoundInput = {
   agents: AgentConfig[];
@@ -28,16 +28,17 @@ export async function runDebateRounds(input: DebateRoundInput): Promise<DebateTr
     };
 
     const roundFindings = await Promise.all(
-      input.agents.map((agent) =>
-        runAgentFindingRound({
-          providerConfig: input.providerConfig,
+      input.agents.map((agent) => {
+        const providerConfig = resolveAgentProviderConfig(agent, input.providerConfig);
+        return runAgentFindingRound({
+          providerConfig,
           system,
           prompt: buildDebatePrompt(agent, input.diff, currentTranscript, debateRound, input.diffConfig),
           agentName: agent.name,
           idPrefix: `debate-${debateRound}-${agent.name}`,
           minConfidence: input.minConfidence,
-        })
-      )
+        });
+      })
     );
 
     transcript.rounds.push(roundFindings.flat());
