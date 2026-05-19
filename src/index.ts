@@ -94,7 +94,6 @@ function buildStatsBlock(): string {
     ...breakdown,
   ].join("\n");
 }
-
 async function main(): Promise<void> {
   const githubToken = readInput("github-token") ?? process.env.GITHUB_TOKEN;
   const anthropicApiKey = readInput("anthropic-api-key") ?? process.env.ANTHROPIC_API_KEY;

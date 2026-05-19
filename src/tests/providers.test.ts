@@ -82,7 +82,6 @@ test("resolveProviderConfig throws if provider apiKey is missing and not found i
     resolveProviderConfig(swarmConfig, undefined, "claude-3-5-sonnet-latest");
   }, /Provider API key is required for openai/);
 });
-
 test("tokenTracker accumulates tokens per model correctly", () => {
   resetTokenTracker();
 

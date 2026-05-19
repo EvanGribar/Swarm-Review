@@ -144,4 +144,3 @@ test("formatFileDiffs respects glob patterns in include_patterns", () => {
   assert.ok(!rendered.includes("dist/index.js"));
   assert.ok(rendered.includes("src/index.ts"));
 });
-
