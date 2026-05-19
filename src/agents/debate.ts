@@ -1,4 +1,5 @@
 import { buildDebatePrompt } from "../prompts.js";
+import { filterDiffForAgent } from "../diff.js";
 import type { AgentConfig, DebateTranscript, FileDiff, Finding, ProviderConfig, DiffConfig } from "../types.js";
 import { runAgentFindingRound, resolveAgentProviderConfig } from "./shared.js";
 
@@ -30,10 +31,16 @@ export async function runDebateRounds(input: DebateRoundInput): Promise<DebateTr
     const roundFindings = await Promise.all(
       input.agents.map((agent) => {
         const providerConfig = resolveAgentProviderConfig(agent, input.providerConfig);
+        const filteredDiff = filterDiffForAgent(input.diff, agent);
+        if (filteredDiff.length === 0) {
+          console.log(`Skipping agent "${agent.name}" in debate round ${debateRound}: no matching files in diff.`);
+          return [];
+        }
+
         return runAgentFindingRound({
           providerConfig,
           system,
-          prompt: buildDebatePrompt(agent, input.diff, currentTranscript, debateRound, input.diffConfig),
+          prompt: buildDebatePrompt(agent, filteredDiff, currentTranscript, debateRound, input.diffConfig),
           agentName: agent.name,
           idPrefix: `debate-${debateRound}-${agent.name}`,
           minConfidence: input.minConfidence,

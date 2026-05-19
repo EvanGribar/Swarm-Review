@@ -28,6 +28,8 @@ export const AgentConfigSchema = z.object({
   name: z.string().min(1),
   mandate: z.string().min(1),
   model: z.string().min(1).optional(),
+  include_patterns: z.array(z.string()).optional(),
+  exclude_patterns: z.array(z.string()).optional(),
 });
 
 export type AgentConfig = z.infer<typeof AgentConfigSchema>;
@@ -81,6 +83,7 @@ export const DiffConfigSchema = z.object({
   max_patch_chars_per_file: z.number().int().positive().default(12_000),
   max_total_chars: z.number().int().positive().default(180_000),
   exclude_patterns: z.array(z.string()).default([]),
+  include_patterns: z.array(z.string()).default([]),
 });
 
 export type DiffConfig = z.infer<typeof DiffConfigSchema>;
@@ -195,13 +198,16 @@ export const SwarmConfigSchema = z.object({
   output: z
     .object({
       mode: z.enum(["outcome", "full"]).default("outcome"),
+      inline: z.boolean().default(false),
+      review_event: z.enum(["COMMENT", "APPROVE", "REQUEST_CHANGES", "AUTO"]).default("COMMENT"),
     })
-    .default({ mode: "outcome" }),
+    .default({ mode: "outcome", inline: false, review_event: "COMMENT" }),
   diff: DiffConfigSchema.default({
     max_files: 80,
     max_patch_chars_per_file: 12_000,
     max_total_chars: 180_000,
     exclude_patterns: [],
+    include_patterns: [],
   }),
   provider: ProviderConfigSchema.optional(),
 });
@@ -232,6 +238,7 @@ export type DebateTranscript = z.infer<typeof DebateTranscriptSchema>;
 export const PrincipalDecisionSchema = z.object({
   finding: FindingSchema,
   decision: z.string().min(1),
+  status: z.enum(["accepted", "rejected", "deferred"]).optional(),
 });
 
 export const PrincipalDisputeSchema = z.object({

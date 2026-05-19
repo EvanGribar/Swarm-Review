@@ -1,4 +1,5 @@
 import { buildReviewPrompt } from "../prompts.js";
+import { filterDiffForAgent } from "../diff.js";
 import type { AgentConfig, FileDiff, Finding, ProviderConfig, DiffConfig } from "../types.js";
 import { runAgentFindingRound, resolveAgentProviderConfig } from "./shared.js";
 
@@ -17,11 +18,16 @@ export async function runReviewRound(input: ReviewRoundInput): Promise<Finding[]
   const findings = await Promise.all(
     input.agents.map((agent) => {
       const providerConfig = resolveAgentProviderConfig(agent, input.providerConfig);
+      const filteredDiff = filterDiffForAgent(input.diff, agent);
+      if (filteredDiff.length === 0) {
+        console.log(`Skipping agent "${agent.name}" in review round: no matching files in diff.`);
+        return [];
+      }
 
       return runAgentFindingRound({
         providerConfig,
         system,
-        prompt: buildReviewPrompt(agent, input.diff, input.diffConfig),
+        prompt: buildReviewPrompt(agent, filteredDiff, input.diffConfig),
         agentName: agent.name,
         idPrefix: `review-${agent.name}`,
         minConfidence: input.minConfidence,

@@ -1,6 +1,6 @@
 import { Octokit } from "@octokit/rest";
 
-import { FileDiffSchema, type DiffConfig, type FileDiff } from "./types.js";
+import { FileDiffSchema, type DiffConfig, type FileDiff, type AgentConfig } from "./types.js";
 
 type DiffFormatOptions = DiffConfig;
 
@@ -9,6 +9,7 @@ const DEFAULT_DIFF_FORMAT_OPTIONS: Required<DiffFormatOptions> = {
   max_patch_chars_per_file: 12_000,
   max_total_chars: 180_000,
   exclude_patterns: [],
+  include_patterns: [],
 };
 
 export function createOctokit(token: string): Octokit {
@@ -94,13 +95,13 @@ export function globToRegex(pattern: string): RegExp {
   }
 }
 
-function getExcludeRegexes(patterns: string[]): RegExp[] {
+export function compilePatterns(patterns: string[]): RegExp[] {
   return patterns
     .map((p) => {
       try {
         return globToRegex(p);
       } catch (e) {
-        console.error(`Invalid exclude pattern "${p}":`, e);
+        console.error(`Invalid pattern "${p}":`, e);
         return null;
       }
     })
@@ -116,12 +117,17 @@ export function formatFileDiffs(files: FileDiff[], options?: Partial<DiffFormatO
   const SEPARATOR = "\n\n---\n\n";
 
   // Pre-compile regex patterns for better performance
-  const excludeRegexes = getExcludeRegexes(settings.exclude_patterns);
+  const excludeRegexes = compilePatterns(settings.exclude_patterns);
+  const includeRegexes = compilePatterns(settings.include_patterns);
 
   // Filter out excluded files
-  const filteredFiles = files.filter(
-    (file) => !excludeRegexes.some((r) => r.test(file.path))
-  );
+  const filteredFiles = files.filter((file) => {
+    if (includeRegexes.length > 0) {
+      const matchesInclude = includeRegexes.some((r) => r.test(file.path));
+      if (!matchesInclude) return false;
+    }
+    return !excludeRegexes.some((r) => r.test(file.path));
+  });
 
   // Pre-calculate metadata to establish the initial budget overhead.
   // We use placeholder counts that won't significantly change the length.
@@ -183,4 +189,53 @@ export function formatFileDiffs(files: FileDiff[], options?: Partial<DiffFormatO
   ].join("\n");
 
   return [metadata, ...renderedFiles].join(SEPARATOR);
+}
+
+export function filterDiffForAgent(diff: FileDiff[], agent: AgentConfig): FileDiff[] {
+  if (!agent.include_patterns && !agent.exclude_patterns) {
+    return diff;
+  }
+
+  const includeRegexes = compilePatterns(agent.include_patterns || []);
+  const excludeRegexes = compilePatterns(agent.exclude_patterns || []);
+
+  return diff.filter((file) => {
+    if (includeRegexes.length > 0) {
+      const matchesInclude = includeRegexes.some((r) => r.test(file.path));
+      if (!matchesInclude) return false;
+    }
+    if (excludeRegexes.length > 0) {
+      const matchesExclude = excludeRegexes.some((r) => r.test(file.path));
+      if (matchesExclude) return false;
+    }
+    return true;
+  });
+}
+
+export function getDiffLineNumbers(patch: string): Set<number> {
+  const lineNumbers = new Set<number>();
+  if (!patch) return lineNumbers;
+
+  const lines = patch.split("\n");
+  let currentNewLine = 0;
+
+  for (const line of lines) {
+    if (line.startsWith("@@")) {
+      const match = line.match(/^@@\s+-\d+(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s+@@/);
+      if (match) {
+        currentNewLine = parseInt(match[1], 10);
+      }
+    } else if (line.startsWith("+")) {
+      lineNumbers.add(currentNewLine);
+      currentNewLine++;
+    } else if (line.startsWith("-")) {
+      // Deletion - doesn't increment new line number
+    } else {
+      // Context line
+      lineNumbers.add(currentNewLine);
+      currentNewLine++;
+    }
+  }
+
+  return lineNumbers;
 }

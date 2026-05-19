@@ -29,3 +29,16 @@ export function renderDebateTranscriptMarkdown(transcript: DebateTranscript): st
 
   return lines.join("\n");
 }
+
+export function formatInlineCommentBody(finding: Finding, decision?: string): string {
+  const emoji = finding.severity === "blocking" ? "🚨" : finding.severity === "warning" ? "⚠️" : "💡";
+  const lines = [
+    `### Swarm-Review Finding ${emoji}`,
+    `- **Agent**: \`${finding.agent}\` (severity: \`${finding.severity}\`, confidence: \`${finding.confidence.toFixed(2)}\`)`,
+    `- **Claim**: ${finding.claim}`,
+  ];
+  if (decision) {
+    lines.push(`- **🧠 Principal Decision**: ${decision}`);
+  }
+  return lines.join("\n");
+}

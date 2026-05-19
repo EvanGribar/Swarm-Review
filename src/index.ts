@@ -1,15 +1,16 @@
 import { existsSync } from "node:fs";
 import { appendFile, readFile } from "node:fs/promises";
 
-import { createOctokit, fetchPullRequestDiff, formatFileDiffs } from "./diff.js";
+import { createOctokit, fetchPullRequestDiff, formatFileDiffs, getDiffLineNumbers } from "./diff.js";
 import { loadSwarmConfig, readInput, resolveProviderConfig } from "./config.js";
 import { runDebateRounds } from "./agents/debate.js";
 import { runReviewRound } from "./agents/review.js";
 import { synthesizePrincipalSummary } from "./agents/principal.js";
-import { upsertPullRequestComment, updateCheckRun, parsePositiveInteger } from "./github.js";
+import { upsertPullRequestComment, updateCheckRun, parsePositiveInteger, createPullRequestReview } from "./github.js";
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_API_ENDPOINT } from "./llm.js";
-import { renderDebateTranscriptMarkdown } from "./format.js";
-import { DEFAULT_PROVIDER_CONFIG, type ProviderConfig, type SwarmConfig } from "./types.js";
+import { renderDebateTranscriptMarkdown, formatInlineCommentBody } from "./format.js";
+import { DEFAULT_PROVIDER_CONFIG, type ProviderConfig, type SwarmConfig, type Finding } from "./types.js";
+import { tokenTracker, resetTokenTracker, calculateEstimatedCost } from "./providers.js";
 
 
 
@@ -67,6 +68,33 @@ async function resolvePullRequestNumber(): Promise<number> {
 
 
 
+function buildStatsBlock(): string {
+  const { cost, hasUnknown } = calculateEstimatedCost();
+  let totalInput = 0;
+  let totalOutput = 0;
+  const breakdown: string[] = [];
+
+  for (const [model, usage] of Object.entries(tokenTracker.models)) {
+    totalInput += usage.inputTokens;
+    totalOutput += usage.outputTokens;
+    breakdown.push(`>   - \`${model}\`: ${usage.calls} calls, ${usage.inputTokens.toLocaleString()} input, ${usage.outputTokens.toLocaleString()} output`);
+  }
+
+  const costStr = hasUnknown
+    ? `$${cost.toFixed(4)}+ USD (contains unknown model pricing)`
+    : `$${cost.toFixed(4)} USD`;
+
+  return [
+    `> [!NOTE]`,
+    `> ### 📊 Swarm-Review Statistics`,
+    `> - **Total LLM Calls**: ${tokenTracker.totalCalls}`,
+    `> - **Total Tokens**: ${totalInput.toLocaleString()} input / ${totalOutput.toLocaleString()} output`,
+    `> - **Estimated Cost**: ${costStr}`,
+    `> - **Usage Breakdown**:`,
+    ...breakdown,
+  ].join("\n");
+}
+
 async function main(): Promise<void> {
   const githubToken = readInput("github-token") ?? process.env.GITHUB_TOKEN;
   const anthropicApiKey = readInput("anthropic-api-key") ?? process.env.ANTHROPIC_API_KEY;
@@ -89,6 +117,8 @@ async function main(): Promise<void> {
 
   console.log(`Running swarm-review for ${owner}/${repo}#${pullNumber}`);
   console.log(`Using provider: ${providerConfig.type}`);
+
+  resetTokenTracker();
 
   const diff = await fetchPullRequestDiff(octokit, owner, repo, pullNumber);
   const reviewFindings = await runReviewRound({
@@ -115,23 +145,113 @@ async function main(): Promise<void> {
     providerConfig,
   });
 
+  const statsBlock = buildStatsBlock();
+
   const headlineSummary = summary.summary.startsWith("## swarm-review")
     ? summary.summary
     : `## swarm-review\n\n${summary.summary}`;
 
-  const commentBody =
+  const baseCommentBody =
     swarmConfig.output.mode === "full"
       ? `${headlineSummary}${renderDebateTranscriptMarkdown(transcript)}`
       : headlineSummary;
 
+  const commentBody = `${baseCommentBody}\n\n${statsBlock}`;
+
   const commentResult = await upsertPullRequestComment(octokit, owner, repo, pullNumber, commentBody);
   const checkRunUpdated = await updateCheckRun(octokit, owner, repo, checkRunId, commentBody);
+
+  const isInline = readInput("inline") === "true" || swarmConfig.output.inline;
+  const rawReviewEvent = readInput("review-event") || swarmConfig.output.review_event;
+  let reviewEvent: "COMMENT" | "APPROVE" | "REQUEST_CHANGES" | "AUTO" = "COMMENT";
+  if (rawReviewEvent === "APPROVE" || rawReviewEvent === "REQUEST_CHANGES" || rawReviewEvent === "AUTO") {
+    reviewEvent = rawReviewEvent;
+  }
+
+  const acceptedFindings: { finding: Finding; decision?: string }[] = [];
+  for (const finding of summary.agreements) {
+    acceptedFindings.push({ finding });
+  }
+  for (const item of summary.final_calls) {
+    const status = item.status;
+    if (status === "accepted" || status === undefined) {
+      acceptedFindings.push({ finding: item.finding, decision: item.decision });
+    }
+  }
+
+  let actualEvent: "COMMENT" | "APPROVE" | "REQUEST_CHANGES" = "COMMENT";
+  if (reviewEvent === "APPROVE") {
+    actualEvent = "APPROVE";
+  } else if (reviewEvent === "REQUEST_CHANGES") {
+    actualEvent = "REQUEST_CHANGES";
+  } else if (reviewEvent === "AUTO") {
+    const hasBlocking = acceptedFindings.some((item) => item.finding.severity === "blocking");
+    if (hasBlocking) {
+      actualEvent = "REQUEST_CHANGES";
+    } else if (acceptedFindings.length === 0) {
+      actualEvent = "APPROVE";
+    } else {
+      actualEvent = "COMMENT";
+    }
+  }
+
+  if (isInline || reviewEvent !== "COMMENT") {
+    const validLinesMap = new Map<string, Set<number>>();
+    for (const file of diff) {
+      if (file.patch) {
+        validLinesMap.set(file.path, getDiffLineNumbers(file.patch));
+      }
+    }
+
+    const reviewComments: Array<{ path: string; line: number; body: string }> = [];
+    if (isInline) {
+      for (const item of acceptedFindings) {
+        const { finding, decision } = item;
+        const validLines = validLinesMap.get(finding.file);
+        if (!validLines || !validLines.has(finding.line)) {
+          console.log(`::warning::Skipping inline comment for ${finding.file}:${finding.line} because it is not within the diff hunk.`);
+          continue;
+        }
+
+        const body = formatInlineCommentBody(finding, decision);
+        reviewComments.push({
+          path: finding.file,
+          line: finding.line,
+          body,
+        });
+      }
+    }
+
+    const reviewBody = `### Swarm-Review Complete\n\nStatus: **${actualEvent}**\n\nSee the main PR comment for the full debate transcript and detailed reasoning.`;
+    await createPullRequestReview(
+      octokit,
+      owner,
+      repo,
+      pullNumber,
+      actualEvent,
+      reviewBody,
+      reviewComments
+    );
+  }
 
   await writeActionOutput("pull-number", String(pullNumber));
   await writeActionOutput("output-mode", swarmConfig.output.mode);
   await writeActionOutput("comment-id", String(commentResult.commentId));
   await writeActionOutput("comment-action", commentResult.action);
   await writeActionOutput("check-run-updated", String(checkRunUpdated));
+
+  let totalInput = 0;
+  let totalOutput = 0;
+  for (const usage of Object.values(tokenTracker.models)) {
+    totalInput += usage.inputTokens;
+    totalOutput += usage.outputTokens;
+  }
+  const { cost } = calculateEstimatedCost();
+
+  await writeActionOutput("total-input-tokens", String(totalInput));
+  await writeActionOutput("total-output-tokens", String(totalOutput));
+  await writeActionOutput("total-cost", cost.toFixed(4));
+  await writeActionOutput("total-calls", String(tokenTracker.totalCalls));
 
   if (commentResult.commentUrl) {
     await writeActionOutput("comment-url", commentResult.commentUrl);

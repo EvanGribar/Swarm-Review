@@ -112,3 +112,27 @@ export async function updateCheckRun(
 
   return true;
 }
+
+export async function createPullRequestReview(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  event: "COMMENT" | "APPROVE" | "REQUEST_CHANGES",
+  body: string,
+  comments: Array<{ path: string; line: number; body: string }>
+): Promise<void> {
+  await octokit.rest.pulls.createReview({
+    owner,
+    repo,
+    pull_number: pullNumber,
+    event,
+    body: body.length > 65535 ? body.slice(0, 65530) + "..." : body,
+    comments: comments.map((c) => ({
+      path: c.path,
+      line: c.line,
+      body: c.body,
+      side: "RIGHT",
+    })),
+  });
+}
