@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## v0.5.0 - 2026-05-19
+
+### Added
+- **GitHub Pull Request Reviews (Inline Comments)**: Published accepted findings directly as inline comments on specific modified lines in the pull request.
+- **Review Status / PR Decision (Approve vs Request Changes)**: Added a `review_event` input support (`COMMENT`, `APPROVE`, `REQUEST_CHANGES`, and `AUTO`) to submit GitHub reviews and request changes when blocking findings are found.
+- **Agent-Specific & Global Include/Exclude Glob Patterns**: Added `include_patterns` and `exclude_patterns` support globally and at the agent level. Reviewers skip running when no matching files are found.
+- **Token Usage and Cost Tracking**: Implemented automated tracking of LLM input/output tokens and cost estimation per model for Anthropic, OpenAI, and Gemini models.
+- **Action Metadata and Metrics Outputs**: Added inputs (`inline`, `review-event`) and outputs (`total-input-tokens`, `total-output-tokens`, `total-cost`, `total-calls`) to `action.yml`.
+
 ## v0.2.0 - 2026-04-21
 
 ### Added

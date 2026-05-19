@@ -75,6 +75,8 @@ agents:
     mandate: >
       Review for security vulnerabilities. Look for injection risks, exposed secrets,
       broken auth, insecure defaults, and unsafe data handling.
+    include_patterns: ["src/**"]
+    exclude_patterns: ["*.spec.ts"]
 
   - name: performance
     mandate: >
@@ -102,11 +104,14 @@ principal:
 
 output:
   mode: outcome
+  inline: false
+  review_event: COMMENT
 
 diff:
   max_files: 80
   max_patch_chars_per_file: 12000
   max_total_chars: 180000
+  include_patterns: []
   exclude_patterns: []
 ```
 
@@ -145,15 +150,20 @@ principal: blocking until this path uses parameterized queries.
 ### Config fields
 
 - `provider`: optional LLM provider configuration (see Provider Configuration below).
-- `agents`: list of reviewer agents, each with a `name`, `mandate`, and optional `model`.
+- `agents`: list of reviewer agents, each with a `name`, `mandate`, optional `model`, and optional agent-level file filters:
+  - `agents[].include_patterns`: glob patterns of files this agent should review.
+  - `agents[].exclude_patterns`: glob patterns of files this agent should ignore.
 - `debate.rounds`: how many debate rounds to run after the first-pass review.
 - `debate.min_confidence`: findings below this threshold are filtered out.
 - `principal.mandate`: instructions for the synthesis agent.
 - `output.mode`: controls whether the transcript is included in the PR comment.
+- `output.inline`: whether to publish accepted findings as inline GitHub review comments.
+- `output.review_event`: GitHub review submission event status (`COMMENT`, `APPROVE`, `REQUEST_CHANGES`, or `AUTO`).
 - `diff.max_files`: maximum number of files to include in the diff sent to agents.
 - `diff.max_patch_chars_per_file`: maximum characters per file patch before truncation.
 - `diff.max_total_chars`: maximum total characters across all files.
-- `diff.exclude_patterns`: array of regex patterns to exclude files from review (e.g., `["\\.lock$", "package-lock\\.json"]`).
+- `diff.include_patterns`: global list of glob patterns to limit review files (e.g., `["src/**"]`).
+- `diff.exclude_patterns`: global list of glob patterns to exclude files from review (e.g., `["\\.lock$", "package-lock\\.json"]`).
 
 ## Provider Configuration
 
@@ -362,6 +372,8 @@ provider:
 - `provider`: LLM provider configuration (see Provider Configuration above).
 - `config-path`: optional path to the swarm config file.
 - `check-run-id`: optional existing check run ID to update after the review.
+- `inline`: optional override to post findings as inline review comments (`true` or `false`).
+- `review-event`: optional override for GitHub review event status (`COMMENT`, `APPROVE`, `REQUEST_CHANGES`, or `AUTO`).
 
 ## Action Outputs
 
@@ -371,6 +383,10 @@ provider:
 - `comment-action`: either `created` or `updated`.
 - `comment-url`: URL of the created or updated PR comment when available.
 - `check-run-updated`: `true` when a valid check run ID was provided and updated.
+- `total-input-tokens`: total input tokens consumed by LLM calls.
+- `total-output-tokens`: total output tokens consumed by LLM calls.
+- `total-cost`: estimated total cost of LLM calls in USD.
+- `total-calls`: total number of LLM calls executed.
 
 ## Example Result
 
