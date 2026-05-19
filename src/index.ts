@@ -2,32 +2,16 @@ import { existsSync } from "node:fs";
 import { appendFile, readFile } from "node:fs/promises";
 
 import { createOctokit, fetchPullRequestDiff, formatFileDiffs } from "./diff.js";
-import { loadSwarmConfig } from "./config.js";
+import { loadSwarmConfig, readInput, resolveProviderConfig } from "./config.js";
 import { runDebateRounds } from "./agents/debate.js";
 import { runReviewRound } from "./agents/review.js";
 import { synthesizePrincipalSummary } from "./agents/principal.js";
 import { upsertPullRequestComment, updateCheckRun, parsePositiveInteger } from "./github.js";
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_API_ENDPOINT } from "./llm.js";
 import { renderDebateTranscriptMarkdown } from "./format.js";
-import { DEFAULT_PROVIDER_CONFIG, type ProviderConfig } from "./types.js";
+import { DEFAULT_PROVIDER_CONFIG, type ProviderConfig, type SwarmConfig } from "./types.js";
 
-function readInput(name: string): string | undefined {
-  const candidates = [
-    `INPUT_${name.toUpperCase()}`,
-    `INPUT_${name.replace(/-/g, "_").toUpperCase()}`,
-    name.toUpperCase(),
-    name.replace(/-/g, "_").toUpperCase(),
-  ];
 
-  for (const candidate of candidates) {
-    const value = process.env[candidate]?.trim();
-    if (value && value.length > 0) {
-      return value;
-    }
-  }
-
-  return undefined;
-}
 
 function resolveRepository(): { owner: string; repo: string } {
   const repository = process.env.GITHUB_REPOSITORY;
@@ -81,6 +65,8 @@ async function resolvePullRequestNumber(): Promise<number> {
   throw new Error("Unable to resolve the pull request number from the GitHub event payload.");
 }
 
+
+
 async function main(): Promise<void> {
   const githubToken = readInput("github-token") ?? process.env.GITHUB_TOKEN;
   const anthropicApiKey = readInput("anthropic-api-key") ?? process.env.ANTHROPIC_API_KEY;
@@ -99,32 +85,7 @@ async function main(): Promise<void> {
   const { owner, repo } = resolveRepository();
   const pullNumber = await resolvePullRequestNumber();
 
-  // Resolve provider config: use config file if present, otherwise fall back to legacy Anthropic inputs
-  let providerConfig: ProviderConfig;
-  if (swarmConfig.provider) {
-    // If config has provider but no API key, try to inject from environment
-    if (!swarmConfig.provider.config.apiKey) {
-      if (swarmConfig.provider.type === "anthropic" && anthropicApiKey) {
-        providerConfig = {
-          type: "anthropic",
-          config: { apiKey: anthropicApiKey, model: swarmConfig.provider.config.model },
-        };
-      } else {
-        throw new Error(`Provider API key is required for ${swarmConfig.provider.type}.`);
-      }
-    } else {
-      providerConfig = swarmConfig.provider;
-    }
-  } else {
-    // Legacy mode: use Anthropic inputs
-    if (!anthropicApiKey) {
-      throw new Error("Anthropic API key is required (set ANTHROPIC_API_KEY or anthropic-api-key input).");
-    }
-    providerConfig = {
-      type: "anthropic",
-      config: { apiKey: anthropicApiKey, model: anthropicModel },
-    };
-  }
+  const providerConfig = resolveProviderConfig(swarmConfig, anthropicApiKey, anthropicModel);
 
   console.log(`Running swarm-review for ${owner}/${repo}#${pullNumber}`);
   console.log(`Using provider: ${providerConfig.type}`);

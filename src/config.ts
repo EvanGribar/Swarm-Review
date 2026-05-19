@@ -9,7 +9,57 @@ import {
   DEFAULT_PRINCIPAL_MANDATE,
   SwarmConfigSchema,
   type SwarmConfig,
+  type ProviderConfig,
 } from "./types.js";
+
+export function readInput(name: string): string | undefined {
+  const candidates = [
+    `INPUT_${name.toUpperCase()}`,
+    `INPUT_${name.replace(/-/g, "_").toUpperCase()}`,
+    name.toUpperCase(),
+    name.replace(/-/g, "_").toUpperCase(),
+  ];
+  for (const c of candidates) {
+    if (process.env[c]) {
+      return process.env[c];
+    }
+  }
+  return undefined;
+}
+
+export function resolveProviderConfig(
+  swarmConfig: SwarmConfig,
+  legacyAnthropicApiKey: string | undefined,
+  legacyAnthropicModel: string
+): ProviderConfig {
+  if (!swarmConfig.provider) {
+    if (!legacyAnthropicApiKey) {
+      throw new Error("Anthropic API key is required (set ANTHROPIC_API_KEY or anthropic-api-key input).");
+    }
+    return {
+      type: "anthropic",
+      config: { apiKey: legacyAnthropicApiKey, model: legacyAnthropicModel },
+    };
+  }
+
+  const { type, config } = swarmConfig.provider;
+  if (config.apiKey && config.apiKey.length > 0) {
+    return swarmConfig.provider;
+  }
+
+  const resolvedApiKey = readInput(`${type}-api-key`) || (type === "anthropic" ? legacyAnthropicApiKey : undefined);
+  if (!resolvedApiKey) {
+    throw new Error(`Provider API key is required for ${type}. Please set ${type.toUpperCase()}_API_KEY environment variable.`);
+  }
+
+  return {
+    type,
+    config: {
+      ...config,
+      apiKey: resolvedApiKey,
+    },
+  } as ProviderConfig;
+}
 
 export const DEFAULT_SWARM_CONFIG: SwarmConfig = SwarmConfigSchema.parse({
   agents: DEFAULT_AGENTS,

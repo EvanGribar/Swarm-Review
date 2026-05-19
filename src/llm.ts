@@ -64,10 +64,47 @@ export async function callLLMStructured<T>(
   prompt: string,
   schema: z.ZodType<T>
 ): Promise<T> {
-  const rawText = await callLLM(providerConfig, system, prompt);
-  const jsonText = extractJsonText(rawText);
-  const parsed = JSON.parse(jsonText) as unknown;
-  return schema.parse(parsed);
+  let currentPrompt = prompt;
+  let lastResponseText = "";
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const rawText = await callLLM(providerConfig, system, currentPrompt);
+      lastResponseText = rawText;
+      const jsonText = extractJsonText(rawText);
+      const parsed = JSON.parse(jsonText) as unknown;
+      return schema.parse(parsed);
+    } catch (error) {
+      const errorMessage =
+        error instanceof z.ZodError
+          ? error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join("; ")
+          : error instanceof Error
+            ? error.message
+            : String(error);
+
+      if (attempt === 3) {
+        console.error(`::error::LLM structured output failed after 3 attempts. Last error: ${errorMessage}`);
+        throw error;
+      }
+
+      console.warn(
+        `::warning::LLM structured output attempt ${attempt} failed: ${errorMessage}. Retrying with feedback...`
+      );
+
+      currentPrompt = [
+        prompt,
+        "---",
+        "CRITICAL: Your previous response failed validation and could not be parsed.",
+        "Your previous response was:",
+        lastResponseText || "[EMPTY RESPONSE]",
+        "Error details:",
+        errorMessage,
+        "Please correct your output and respond ONLY with a valid JSON block that perfectly matches the requested schema. Do not include markdown fences, preamble, or other commentary.",
+      ].join("\n\n");
+    }
+  }
+
+  throw new Error("LLM structured output failed unexpectedly.");
 }
 
 // Legacy functions for backward compatibility

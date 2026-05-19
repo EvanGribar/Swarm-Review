@@ -43,13 +43,64 @@ export async function fetchPullRequestDiff(
   );
 }
 
+export function globToRegex(pattern: string): RegExp {
+  const hasGlobChars = /[*?]/.test(pattern);
+  if (!hasGlobChars) {
+    try {
+      return new RegExp(pattern);
+    } catch {
+      // Proceed to glob conversion if it fails to compile directly
+    }
+  }
+
+  let regexStr = "";
+  let i = 0;
+  while (i < pattern.length) {
+    const char = pattern[i];
+    if (char === "*") {
+      if (pattern[i + 1] === "*") {
+        if (pattern[i + 2] === "/") {
+          regexStr += "(?:.*/)?";
+          i += 3;
+        } else {
+          regexStr += ".*";
+          i += 2;
+        }
+      } else {
+        regexStr += "[^/]*";
+        i += 1;
+      }
+    } else if (char === "?") {
+      regexStr += "[^/]";
+      i += 1;
+    } else if ("[\\^$.|?*+()".includes(char)) {
+      regexStr += "\\" + char;
+      i += 1;
+    } else {
+      regexStr += char;
+      i += 1;
+    }
+  }
+
+  const cleanPattern = pattern.endsWith("/") ? pattern.slice(0, -1) : pattern;
+  const hasSlash = cleanPattern.includes("/");
+
+  if (!hasSlash) {
+    return new RegExp(`(?:^|\\/)${regexStr}$`);
+  } else {
+    const prefix = regexStr.startsWith("^") ? "" : "^";
+    const suffix = regexStr.endsWith("$") ? "" : "$";
+    return new RegExp(`${prefix}${regexStr}${suffix}`);
+  }
+}
+
 function getExcludeRegexes(patterns: string[]): RegExp[] {
   return patterns
     .map((p) => {
       try {
-        return new RegExp(p);
+        return globToRegex(p);
       } catch (e) {
-        console.error(`Invalid regex pattern "${p}":`, e);
+        console.error(`Invalid exclude pattern "${p}":`, e);
         return null;
       }
     })

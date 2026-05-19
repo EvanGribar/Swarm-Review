@@ -1,6 +1,6 @@
 import { buildReviewPrompt } from "../prompts.js";
 import type { AgentConfig, FileDiff, Finding, ProviderConfig, DiffConfig } from "../types.js";
-import { runAgentFindingRound } from "./shared.js";
+import { runAgentFindingRound, resolveAgentProviderConfig } from "./shared.js";
 
 export type ReviewRoundInput = {
   agents: AgentConfig[];
@@ -16,76 +16,7 @@ export async function runReviewRound(input: ReviewRoundInput): Promise<Finding[]
 
   const findings = await Promise.all(
     input.agents.map((agent) => {
-      // Use agent-specific model override if provided
-      let providerConfig = input.providerConfig;
-      if (agent.model) {
-        if (input.providerConfig.type === "anthropic") {
-          providerConfig = {
-            type: "anthropic",
-            config: { ...input.providerConfig.config, model: agent.model },
-          };
-        } else if (input.providerConfig.type === "openai") {
-          providerConfig = {
-            type: "openai",
-            config: { ...input.providerConfig.config, model: agent.model },
-          };
-        } else if (input.providerConfig.type === "openrouter") {
-          providerConfig = {
-            type: "openrouter",
-            config: { ...input.providerConfig.config, model: agent.model },
-          };
-        } else if (input.providerConfig.type === "openclaw") {
-          providerConfig = {
-            type: "openclaw",
-            config: { ...input.providerConfig.config, model: agent.model },
-          };
-        } else if (input.providerConfig.type === "hermes") {
-          providerConfig = {
-            type: "hermes",
-            config: { ...input.providerConfig.config, model: agent.model },
-          };
-        } else if (input.providerConfig.type === "groq") {
-          providerConfig = {
-            type: "groq",
-            config: { ...input.providerConfig.config, model: agent.model },
-          };
-        } else if (input.providerConfig.type === "together") {
-          providerConfig = {
-            type: "together",
-            config: { ...input.providerConfig.config, model: agent.model },
-          };
-        } else if (input.providerConfig.type === "mistral") {
-          providerConfig = {
-            type: "mistral",
-            config: { ...input.providerConfig.config, model: agent.model },
-          };
-        } else if (input.providerConfig.type === "cohere") {
-          providerConfig = {
-            type: "cohere",
-            config: { ...input.providerConfig.config, model: agent.model },
-          };
-        } else if (input.providerConfig.type === "perplexity") {
-          providerConfig = {
-            type: "perplexity",
-            config: { ...input.providerConfig.config, model: agent.model },
-          };
-        } else if (input.providerConfig.type === "hyperbolic") {
-          providerConfig = {
-            type: "hyperbolic",
-            config: { ...input.providerConfig.config, model: agent.model },
-          };
-        } else if (input.providerConfig.type === "gemini") {
-          providerConfig = {
-            type: "gemini",
-            config: { ...input.providerConfig.config, model: agent.model },
-          };
-        } else if (input.providerConfig.type === "custom") {
-          providerConfig = {
-            type: "custom",
-            config: { ...input.providerConfig.config, model: agent.model },
-          };
-        }
-      }
+      const providerConfig = resolveAgentProviderConfig(agent, input.providerConfig);
 
       return runAgentFindingRound({
         providerConfig,
