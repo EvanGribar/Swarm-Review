@@ -232,4 +232,11 @@ That output. That is the goal. Every implementation decision should serve produc
 
 ## Roadmap
 
-The strategic development goals and future milestones are documented in [ROADMAP.md](file:///c:/Users/evang/Documents/Coding/Swarm-Review/ROADMAP.md). This includes feature descriptions and timelines for upcoming releases (`v0.6.0` through `v1.0.0`).
+The strategic development goals and future milestones are documented in [ROADMAP.md](file:///c:/Users/evang/Documents/Coding/Swarm-Review/ROADMAP.md).
+
+> [!IMPORTANT]
+> **Rule for Future AI Agents:**
+> When updating the roadmap to mark a phase/milestone as completed:
+> 1. Completely remove the completed phase/milestone and all of its details/subsections from `ROADMAP.md` (only show upcoming, non-completed milestones/phases).
+> 2. Clean up the Gantt chart in `ROADMAP.md` to only display future releases.
+> 3. Assess the project's current state and add new future milestones or phases to the roadmap as needed.
