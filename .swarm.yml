@@ -135,3 +135,12 @@ diff:
   max_patch_chars_per_file: 12000
   max_total_chars: 180000
   exclude_patterns: []
+
+static_analysis:
+  enabled: false
+  commands: []
+
+context_enrichment:
+  enabled: true
+  max_depth: 1
+  file_size_limit_kb: 100
