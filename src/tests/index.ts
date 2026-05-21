@@ -9,3 +9,4 @@ import "./github.test.js";
 import "./llm.test.js";
 import "./prompts.test.js";
 import "./providers.test.js";
+import "./static_analysis.test.js";

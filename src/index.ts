@@ -9,6 +9,7 @@ import { synthesizePrincipalSummary } from "./agents/principal.js";
 import { upsertPullRequestComment, updateCheckRun, parsePositiveInteger, createPullRequestReview } from "./github.js";
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_API_ENDPOINT } from "./llm.js";
 import { renderDebateTranscriptMarkdown, formatInlineCommentBody } from "./format.js";
+import { runStaticAnalysis } from "./static_analysis.js";
 import { DEFAULT_PROVIDER_CONFIG, type ProviderConfig, type SwarmConfig, type Finding } from "./types.js";
 import { tokenTracker, resetTokenTracker, calculateEstimatedCost } from "./providers.js";
 
@@ -120,6 +121,8 @@ async function main(): Promise<void> {
   resetTokenTracker();
 
   const diff = await fetchPullRequestDiff(octokit, owner, repo, pullNumber);
+  const linterFindings = await runStaticAnalysis(swarmConfig.static_analysis, workspaceRoot);
+
   const reviewFindings = await runReviewRound({
     agents: swarmConfig.agents,
     diff,
@@ -128,10 +131,12 @@ async function main(): Promise<void> {
     diffConfig: swarmConfig.diff,
   });
 
+  const combinedFindings = [...reviewFindings, ...linterFindings];
+
   const transcript = await runDebateRounds({
     agents: swarmConfig.agents,
     diff,
-    initialFindings: reviewFindings,
+    initialFindings: combinedFindings,
     rounds: swarmConfig.debate.rounds,
     providerConfig,
     minConfidence: swarmConfig.debate.min_confidence,
