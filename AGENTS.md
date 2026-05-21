@@ -213,3 +213,9 @@ A developer opens a PR. Within 2 minutes, a comment appears that reads like this
 ```
 
 That output. That is the goal. Every implementation decision should serve producing exactly that.
+
+---
+
+## Roadmap
+
+The strategic development goals and future milestones are documented in [ROADMAP.md](file:///c:/Users/evang/Documents/Coding/Swarm-Review/ROADMAP.md). This includes feature descriptions and timelines for upcoming releases (`v0.6.0` through `v1.0.0`).
