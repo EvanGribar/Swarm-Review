@@ -12,6 +12,7 @@ import { renderDebateTranscriptMarkdown, formatInlineCommentBody } from "./forma
 import { runStaticAnalysis } from "./static_analysis.js";
 import { DEFAULT_PROVIDER_CONFIG, type ProviderConfig, type SwarmConfig, type Finding } from "./types.js";
 import { tokenTracker, resetTokenTracker, calculateEstimatedCost } from "./providers.js";
+import { buildCodebaseIndex } from "./context.js";
 
 
 
@@ -123,12 +124,19 @@ async function main(): Promise<void> {
   const diff = await fetchPullRequestDiff(octokit, owner, repo, pullNumber);
   const linterFindings = await runStaticAnalysis(swarmConfig.static_analysis, workspaceRoot);
 
+  console.log("Building codebase index for AST navigation...");
+  const codebaseIndex = buildCodebaseIndex(workspaceRoot, swarmConfig.context_enrichment);
+  console.log(`Indexed ${codebaseIndex.size} symbols.`);
+
   const reviewFindings = await runReviewRound({
     agents: swarmConfig.agents,
     diff,
     providerConfig,
     minConfidence: swarmConfig.debate.min_confidence,
     diffConfig: swarmConfig.diff,
+    contextEnrichment: swarmConfig.context_enrichment,
+    workspaceRoot,
+    codebaseIndex,
   });
 
   const combinedFindings = [...reviewFindings, ...linterFindings];
@@ -141,6 +149,9 @@ async function main(): Promise<void> {
     providerConfig,
     minConfidence: swarmConfig.debate.min_confidence,
     diffConfig: swarmConfig.diff,
+    contextEnrichment: swarmConfig.context_enrichment,
+    workspaceRoot,
+    codebaseIndex,
   });
 
   const summary = await synthesizePrincipalSummary({

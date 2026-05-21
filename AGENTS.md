@@ -27,6 +27,8 @@ All agents receive the raw git diff in parallel. Each agent has no knowledge of 
 
 Additionally, if **Static Analysis** is enabled, linter and compiler tools (like ESLint and TypeScript compilation) are executed in the runner workspace. Their parsed diagnostics join the round 1 review findings and serve as ground-truth facts during the debate phase.
 
+If **Context Enrichment** is enabled, import dependencies in changed files are recursively traced up to `max_depth` (using AST parsing via the TypeScript compiler). Skeletal signatures (excluding method/function bodies) of imported classes, functions, types, and variables are extracted and injected into the review and debate prompts as supporting codebase context, preventing context window explosion while providing necessary code details.
+
 ### Round 2 — debate
 Each agent receives the full findings from all other agents. Each agent can produce new findings or rebuttals targeting another agent's finding by ID. Rebuttals can agree, dispute, or escalate. Agents can be rebutted back. The number of debate rounds is configurable.
 
@@ -122,6 +124,11 @@ static_analysis:
       run: npx tsc --noEmit
       parser: regex
       regex: "(?<file>[^:]+):(?<line>\\d+):(?<column>\\d+) - (?<claim>.+)"
+
+context_enrichment:
+  enabled: true           # whether to resolve dependencies and pull signature context
+  max_depth: 1            # how deep to recursively trace import dependencies
+  file_size_limit_kb: 100 # ignore dependency files larger than this to prevent context bloat
 ```
 
 ---

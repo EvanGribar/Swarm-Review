@@ -7,9 +7,9 @@ gantt
     title Swarm-Review Release Timeline
     dateFormat  YYYY-MM-DD
     section Future Milestones
-    v0.7.0 (Context Enrichment & AST Navigation) :active, 2026-06-16, 20d
-    v0.8.0 (Interactive Feedback & Agent Profiles) : 2026-07-06, 15d
+    v0.8.0 (Interactive Feedback & Agent Profiles) :active, 2026-07-06, 15d
     v1.0.0 (Production Hardening & Cost Controls) : 2026-07-21, 20d
+    v1.1.0 (Integration Framework & Web UI Dashboard) : 2026-08-10, 20d
 ```
 
 ---
@@ -23,23 +23,6 @@ Our goal is to make **swarm-review** the premier open-source multi-agent PR revi
 ---
 
 ## 🚀 Milestones
-
-### 📍 Phase 2: Context Enrichment & AST Codebase Navigation (v0.7.0)
-*Reviewing changes purely within diff hunks limits the agent's understanding of global state, API signatures, and cross-file side effects.*
-
-#### Proposed Features
-- **Import Dependency Resolution**:
-  - Parse `import` or `require` statements in changed files to trace relevant dependencies.
-  - Pull class, method, or function signatures from imported files as supporting context for the reviewing agents.
-- **Reference-Aware Prompting**:
-  - Enrich the prompts in `src/prompts.ts` with a "code context" block detailing signature declarations of referenced code.
-- **Incremental Codebase Indexing**:
-  - Run a lightweight treesitter or regex parser over the repository to build a map of class and function signatures.
-
-> [!TIP]
-> To avoid context window explosion, context enrichment will be strictly limited by depth (e.g., depth 1 imports only) and file size constraints.
-
----
 
 ### 📍 Phase 3: Interactive Feedback Loops & Agent Tuning (v0.8.0)
 *Currently, the review is a one-way street. Users should be able to clarify questions, dispute findings, or instruct agents to re-evaluate their recommendations.*
@@ -88,6 +71,17 @@ static_analysis:
   commands:
     - run: npm run lint
 ```
+
+### 📍 Phase 5: Integration Framework & Web UI Dashboard (v1.1.0)
+*Expanding beyond GitHub Actions to support local development environments, pre-commit hooks, and a visual dashboard for review reports.*
+
+#### Proposed Features
+- **Local CLI Review**:
+  - Run the swarm locally on unstaged changes or git branches, producing markdown or HTML reports.
+- **Web UI Dashboard**:
+  - A lightweight local web app to view complex debates interactively, trace decision paths, and inspect code signatures side-by-side.
+- **Pluggable Agent Packages**:
+  - Support importing third-party agent rosters and custom prompts from npm packages or external URLs.
 
 ---
 
