@@ -10,13 +10,27 @@ function baseInstructions(): string {
   ].join(" ");
 }
 
-export function buildReviewPrompt(agent: AgentConfig, diff: FileDiff[], diffConfig?: DiffConfig): string {
-  return [
+export function buildReviewPrompt(
+  agent: AgentConfig,
+  diff: FileDiff[],
+  diffConfig?: DiffConfig,
+  codeContext?: string
+): string {
+  const parts = [
     `Agent name: ${agent.name}`,
     `Mandate: ${agent.mandate}`,
+  ];
+
+  if (codeContext && codeContext.trim()) {
+    parts.push(codeContext.trim());
+  }
+
+  parts.push(
     `Full diff:\n${formatFileDiffs(diff, diffConfig)}`,
-    `Instructions: ${baseInstructions()} Return a JSON array of findings that match the swarm contract. Include id, agent, severity, file, line, claim, confidence, and optional rebuttal_to.`,
-  ].join("\n\n");
+    `Instructions: ${baseInstructions()} Return a JSON array of findings that match the swarm contract. Include id, agent, severity, file, line, claim, confidence, and optional rebuttal_to.`
+  );
+
+  return parts.join("\n\n");
 }
 
 export function buildDebatePrompt(
@@ -24,16 +38,26 @@ export function buildDebatePrompt(
   diff: FileDiff[],
   transcript: DebateTranscript,
   debateRound: number,
-  diffConfig?: DiffConfig
+  diffConfig?: DiffConfig,
+  codeContext?: string
 ): string {
-  return [
+  const parts = [
     `Agent name: ${agent.name}`,
     `Mandate: ${agent.mandate}`,
     `Debate round: ${debateRound}`,
+  ];
+
+  if (codeContext && codeContext.trim()) {
+    parts.push(codeContext.trim());
+  }
+
+  parts.push(
     `Full diff:\n${formatFileDiffs(diff, diffConfig)}`,
     `Prior transcript:\n${JSON.stringify(transcript, null, 2)}`,
-    `Instructions: ${baseInstructions()} Return a JSON array of new findings or rebuttals for this round. Each finding should target the existing transcript when relevant via rebuttal_to.`,
-  ].join("\n\n");
+    `Instructions: ${baseInstructions()} Return a JSON array of new findings or rebuttals for this round. Each finding should target the existing transcript when relevant via rebuttal_to.`
+  );
+
+  return parts.join("\n\n");
 }
 
 export function buildPrincipalPrompt(

@@ -212,6 +212,12 @@ export const StaticAnalysisConfigSchema = z.object({
   commands: z.array(StaticAnalysisCommandSchema).default([]),
 });
 
+export const ContextEnrichmentConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  max_depth: z.number().int().min(1).default(1),
+  file_size_limit_kb: z.number().int().min(1).default(100),
+});
+
 export const SwarmConfigSchema = z.object({
   agents: z.array(AgentConfigSchema).min(1).default(DEFAULT_AGENTS),
   debate: DebateConfigSchema.default(DEFAULT_DEBATE_CONFIG),
@@ -235,6 +241,11 @@ export const SwarmConfigSchema = z.object({
     enabled: false,
     commands: [],
   }),
+  context_enrichment: ContextEnrichmentConfigSchema.default({
+    enabled: true,
+    max_depth: 1,
+    file_size_limit_kb: 100,
+  }),
 });
 
 export type DebateConfig = z.infer<typeof DebateConfigSchema>;
@@ -242,6 +253,7 @@ export type PrincipalConfig = z.infer<typeof PrincipalConfigSchema>;
 export type SwarmConfig = z.infer<typeof SwarmConfigSchema>;
 export type StaticAnalysisCommand = z.infer<typeof StaticAnalysisCommandSchema>;
 export type StaticAnalysisConfig = z.infer<typeof StaticAnalysisConfigSchema>;
+export type ContextEnrichmentConfig = z.infer<typeof ContextEnrichmentConfigSchema>;
 
 
 export const FileDiffSchema = z.object({
