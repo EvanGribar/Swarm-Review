@@ -216,6 +216,7 @@ export const ContextEnrichmentConfigSchema = z.object({
   enabled: z.boolean().default(true),
   max_depth: z.number().int().min(1).default(1),
   file_size_limit_kb: z.number().int().min(1).default(100),
+  ignored_dirs: z.array(z.string()).optional(),
 });
 
 export const SwarmConfigSchema = z.object({

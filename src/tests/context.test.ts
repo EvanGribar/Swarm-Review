@@ -11,6 +11,8 @@ import {
   extractSignatures,
   buildCodebaseIndex,
   gatherContextForDiff,
+  clearContextCaches,
+  resolvePathAlias,
 } from "../context.js";
 
 test("getImportSpecifiers extracts all kinds of imports/requires", () => {
@@ -53,20 +55,85 @@ test("resolveImportPath correctly resolves extensions and directories", async (t
     await rm(tempDir, { recursive: true, force: true });
   });
 
+  clearContextCaches();
+
   // Resolve direct file
-  const r1 = resolveImportPath(importingFile, "./foo");
+  const r1 = resolveImportPath(importingFile, "./foo", tempDir);
   assert.equal(r1, path.resolve(tempDir, "foo.ts"));
 
-  const r2 = resolveImportPath(importingFile, "./bar");
+  const r2 = resolveImportPath(importingFile, "./bar", tempDir);
   assert.equal(r2, path.resolve(tempDir, "bar.tsx"));
 
   // Resolve directory index
-  const r3 = resolveImportPath(importingFile, "./utils");
+  const r3 = resolveImportPath(importingFile, "./utils", tempDir);
   assert.equal(r3, path.resolve(subDir, "index.ts"));
 
   // Check invalid/external
-  const r4 = resolveImportPath(importingFile, "external-library");
+  const r4 = resolveImportPath(importingFile, "external-library", tempDir);
   assert.equal(r4, null);
+});
+
+test("resolveImportPath rejects path traversal outside workspaceRoot", () => {
+  clearContextCaches();
+  const workspaceRoot = path.resolve("/workspace");
+  const importingFile = path.resolve("/workspace/src/main.ts");
+
+  // Attempts path traversal to parent directory outside workspace
+  const resolved = resolveImportPath(importingFile, "../../../etc/passwd", workspaceRoot);
+  assert.equal(resolved, null);
+});
+
+test("resolvePathAlias resolves typescript aliases and baseUrl correctly", () => {
+  const pathsConfig = {
+    baseUrl: "./src",
+    paths: {
+      "@/*": ["*"],
+      "@utils/*": ["utils/*"],
+      "config": ["config/index.ts"]
+    }
+  };
+
+  const workspaceRoot = path.resolve("/workspace");
+
+  // 1. Prefix wildcard
+  const r1 = resolvePathAlias("@utils/math", pathsConfig, workspaceRoot);
+  assert.deepEqual(r1, [path.resolve(workspaceRoot, "src/utils/math")]);
+
+  // 2. Exact match
+  const r2 = resolvePathAlias("config", pathsConfig, workspaceRoot);
+  assert.deepEqual(r2, [path.resolve(workspaceRoot, "src/config/index.ts")]);
+
+  // 3. Fallback to baseUrl
+  const r3 = resolvePathAlias("helpers/formatter", pathsConfig, workspaceRoot);
+  assert.deepEqual(r3, [path.resolve(workspaceRoot, "src/helpers/formatter")]);
+});
+
+test("clearContextCaches and resolution caching operates properly", async (t) => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "swarm-cache-test-"));
+  t.after(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  const file1 = path.join(tempDir, "dep.ts");
+  await writeFile(file1, "export const val = 1;");
+
+  const importingFile = path.join(tempDir, "main.ts");
+
+  clearContextCaches();
+
+  // Resolve once
+  const resolvedFirst = resolveImportPath(importingFile, "./dep", tempDir);
+  assert.equal(resolvedFirst, path.resolve(file1));
+
+  // Delete physical file, check that it still resolves due to cache
+  await rm(file1);
+  const resolvedSecond = resolveImportPath(importingFile, "./dep", tempDir);
+  assert.equal(resolvedSecond, path.resolve(file1));
+
+  // Clear cache, resolution should fail/return null now
+  clearContextCaches();
+  const resolvedThird = resolveImportPath(importingFile, "./dep", tempDir);
+  assert.equal(resolvedThird, null);
 });
 
 test("extractSignatures filters bodies and returns correct declarations", () => {
@@ -83,7 +150,7 @@ test("extractSignatures filters bodies and returns correct declarations", () => 
         return this.base + val;
       }
     }
-
+ 
     export interface User {
       id: string;
       name: string;
@@ -98,6 +165,7 @@ test("extractSignatures filters bodies and returns correct declarations", () => 
     let count = 0;
   `;
 
+  clearContextCaches();
   const sigs = extractSignatures("calc.ts", fileContent);
 
   // Check expected signatures
@@ -154,6 +222,7 @@ test("gatherContextForDiff builds context for changed files using index and impo
     file_size_limit_kb: 100,
   };
 
+  clearContextCaches();
   const codebaseIndex = buildCodebaseIndex(tempDir, config);
   const context = await gatherContextForDiff(diff, tempDir, config, codebaseIndex);
 

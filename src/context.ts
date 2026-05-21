@@ -2,6 +2,7 @@ import ts from "typescript";
 import path from "node:path";
 import { existsSync, statSync, readdirSync, readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { execSync } from "node:child_process";
 import type { FileDiff, ContextEnrichmentConfig } from "./types.js";
 
 export interface IndexedSymbol {
@@ -10,57 +11,205 @@ export interface IndexedSymbol {
   signature: string;
 }
 
+export interface TsConfigPaths {
+  baseUrl?: string;
+  paths?: Record<string, string[]>;
+}
+
+// Module-level caches to avoid redundant file I/O and AST parsing
+const signatureCache = new Map<string, string>();
+const importPathsCache = new Map<string, string | null>();
+const importSpecifiersCache = new Map<string, string[]>();
+
+export const DEFAULT_IGNORED_DIRS = [
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  "out",
+  ".next",
+  "target",
+  "coverage",
+  "bin",
+  "obj",
+];
+
 /**
- * Resolves a relative import or require path to the actual file path on disk.
+ * Clears all cached path resolutions, file signatures, and import specifiers.
+ * Useful to prevent test pollution in test suites.
  */
-export function resolveImportPath(importingFilePath: string, importSpecifier: string): string | null {
-  if (!importSpecifier.startsWith(".") && !importSpecifier.startsWith("/")) {
-    return null; // Skip external packages
+export function clearContextCaches(): void {
+  signatureCache.clear();
+  importPathsCache.clear();
+  importSpecifiersCache.clear();
+}
+
+/**
+ * Loads tsconfig.json paths and baseUrl configuration from the workspace root.
+ */
+export function loadTsConfigPaths(workspaceRoot: string): TsConfigPaths {
+  const tsconfigPath = path.resolve(workspaceRoot, "tsconfig.json");
+  if (!existsSync(tsconfigPath)) {
+    return {};
   }
-
-  const dir = path.dirname(importingFilePath);
-  const targetPath = path.resolve(dir, importSpecifier);
-  const extensions = [".ts", ".tsx", ".d.ts", ".js", ".jsx", ".mjs", ".cjs"];
-
-  // 1. Direct path check
   try {
-    if (existsSync(targetPath) && !statSync(targetPath).isDirectory()) {
-      return targetPath;
+    const parseResult = ts.readConfigFile(tsconfigPath, ts.sys.readFile);
+    if (parseResult.error) {
+      return {};
     }
+    const compilerOptions = parseResult.config?.compilerOptions;
+    if (!compilerOptions) {
+      return {};
+    }
+    return {
+      baseUrl: compilerOptions.baseUrl,
+      paths: compilerOptions.paths,
+    };
   } catch {
-    // Ignore stat/exists errors
+    return {};
   }
+}
 
-  // 2. Try replacing/appending extensions
-  const parsed = path.parse(targetPath);
-  const pathWithoutExt = path.join(parsed.dir, parsed.name);
+/**
+ * Maps a non-relative import specifier to absolute path candidates using tsconfig.json paths.
+ */
+export function resolvePathAlias(
+  importSpecifier: string,
+  pathsConfig: TsConfigPaths,
+  workspaceRoot: string
+): string[] {
+  const { baseUrl, paths } = pathsConfig;
+  const resolvedCandidates: string[] = [];
 
-  for (const ext of extensions) {
-    const p = pathWithoutExt + ext;
-    if (existsSync(p)) {
-      return p;
-    }
-  }
-
-  for (const ext of extensions) {
-    const p = targetPath + ext;
-    if (existsSync(p)) {
-      return p;
-    }
-  }
-
-  // 3. Try directory index files
-  try {
-    if (existsSync(targetPath) && statSync(targetPath).isDirectory()) {
-      for (const ext of extensions) {
-        const p = path.join(targetPath, "index" + ext);
-        if (existsSync(p)) {
-          return p;
+  if (paths) {
+    for (const pattern of Object.keys(paths)) {
+      const targets = paths[pattern];
+      if (pattern.includes("*")) {
+        const prefix = pattern.replace("*", "");
+        if (importSpecifier.startsWith(prefix)) {
+          const suffix = importSpecifier.slice(prefix.length);
+          for (const target of targets) {
+            const resolvedRel = target.replace("*", suffix);
+            const base = baseUrl ? path.resolve(workspaceRoot, baseUrl) : workspaceRoot;
+            resolvedCandidates.push(path.resolve(base, resolvedRel));
+          }
+        }
+      } else {
+        if (importSpecifier === pattern) {
+          for (const target of targets) {
+            const base = baseUrl ? path.resolve(workspaceRoot, baseUrl) : workspaceRoot;
+            resolvedCandidates.push(path.resolve(base, target));
+          }
         }
       }
     }
-  } catch {
-    // Ignore directory stat errors
+  }
+
+  // Fallback to baseUrl if import is not relative and baseUrl is specified
+  if (
+    baseUrl &&
+    !importSpecifier.startsWith(".") &&
+    !importSpecifier.startsWith("/") &&
+    resolvedCandidates.length === 0
+  ) {
+    const base = path.resolve(workspaceRoot, baseUrl);
+    resolvedCandidates.push(path.resolve(base, importSpecifier));
+  }
+
+  return resolvedCandidates;
+}
+
+/**
+ * Resolves a relative or aliased import path to the actual file path on disk.
+ * Validates that the resolved path is contained within the workspace root to prevent path traversal.
+ */
+export function resolveImportPath(
+  importingFilePath: string,
+  importSpecifier: string,
+  workspaceRoot?: string,
+  pathsConfig?: TsConfigPaths
+): string | null {
+  const cacheKey = `${importingFilePath}::${importSpecifier}`;
+  if (importPathsCache.has(cacheKey)) {
+    return importPathsCache.get(cacheKey)!;
+  }
+
+  const result = resolveImportPathInternal(importingFilePath, importSpecifier, workspaceRoot, pathsConfig);
+  importPathsCache.set(cacheKey, result);
+  return result;
+}
+
+function resolveImportPathInternal(
+  importingFilePath: string,
+  importSpecifier: string,
+  workspaceRoot?: string,
+  pathsConfig?: TsConfigPaths
+): string | null {
+  const isRelative = importSpecifier.startsWith(".") || importSpecifier.startsWith("/");
+
+  const isSafe = (p: string) => {
+    if (!workspaceRoot) return true;
+    const absWorkspaceRoot = path.resolve(workspaceRoot);
+    const absPath = path.resolve(p);
+    const relative = path.relative(absWorkspaceRoot, absPath);
+    return !relative.startsWith("..") && !path.isAbsolute(relative);
+  };
+
+  const extensions = [".ts", ".tsx", ".d.ts", ".js", ".jsx", ".mjs", ".cjs"];
+
+  const checkCandidates = (targetPaths: string[]): string | null => {
+    for (const targetPath of targetPaths) {
+      try {
+        if (existsSync(targetPath) && !statSync(targetPath).isDirectory() && isSafe(targetPath)) {
+          return targetPath;
+        }
+      } catch {}
+
+      // Try replacing/appending extensions
+      const parsed = path.parse(targetPath);
+      const pathWithoutExt = path.join(parsed.dir, parsed.name);
+
+      for (const ext of extensions) {
+        const p = pathWithoutExt + ext;
+        if (existsSync(p) && isSafe(p)) {
+          return p;
+        }
+      }
+
+      for (const ext of extensions) {
+        const p = targetPath + ext;
+        if (existsSync(p) && isSafe(p)) {
+          return p;
+        }
+      }
+
+      // Try directory index files
+      try {
+        if (existsSync(targetPath) && statSync(targetPath).isDirectory()) {
+          for (const ext of extensions) {
+            const p = path.join(targetPath, "index" + ext);
+            if (existsSync(p) && isSafe(p)) {
+              return p;
+            }
+          }
+        }
+      } catch {}
+    }
+    return null;
+  };
+
+  if (isRelative) {
+    const dir = path.dirname(importingFilePath);
+    const targetPath = path.resolve(dir, importSpecifier);
+    return checkCandidates([targetPath]);
+  }
+
+  // Otherwise check path alias/baseUrl mapping
+  if (workspaceRoot && pathsConfig) {
+    const candidates = resolvePathAlias(importSpecifier, pathsConfig, workspaceRoot);
+    if (candidates.length > 0) {
+      return checkCandidates(candidates);
+    }
   }
 
   return null;
@@ -110,6 +259,10 @@ function cleanBody(sigText: string): string {
  * Extracts signature declarations for classes, functions, interfaces, types, and variables.
  */
 export function extractSignatures(filePath: string, fileContent: string): string {
+  if (signatureCache.has(filePath)) {
+    return signatureCache.get(filePath)!;
+  }
+
   const sourceFile = ts.createSourceFile(filePath, fileContent, ts.ScriptTarget.Latest, true);
   const signatures: string[] = [];
 
@@ -175,13 +328,15 @@ export function extractSignatures(filePath: string, fileContent: string): string
     }
   }
 
-  return signatures.join("\n\n");
+  const result = signatures.join("\n\n");
+  signatureCache.set(filePath, result);
+  return result;
 }
 
 /**
  * Scans a directory recursively for TS/JS files.
  */
-function scanDirectory(dir: string, fileList: string[] = []): string[] {
+function scanDirectory(dir: string, ignoredDirs: string[], fileList: string[] = []): string[] {
   if (!existsSync(dir)) return fileList;
   const files = readdirSync(dir);
   for (const file of files) {
@@ -193,8 +348,8 @@ function scanDirectory(dir: string, fileList: string[] = []): string[] {
       continue;
     }
     if (stat.isDirectory()) {
-      if (file !== "node_modules" && file !== ".git" && file !== "dist") {
-        scanDirectory(fullPath, fileList);
+      if (!ignoredDirs.includes(file)) {
+        scanDirectory(fullPath, ignoredDirs, fileList);
       }
     } else {
       const ext = path.extname(file);
@@ -207,7 +362,33 @@ function scanDirectory(dir: string, fileList: string[] = []): string[] {
 }
 
 /**
+ * Obtains a list of git-tracked files in the workspace.
+ */
+function getGitTrackedFiles(workspaceRoot: string): string[] | null {
+  try {
+    const stdout = execSync("git ls-files", {
+      cwd: workspaceRoot,
+      maxBuffer: 10 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "ignore"],
+    }).toString();
+
+    return stdout
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => {
+        if (!line) return false;
+        const ext = path.extname(line);
+        return [".ts", ".tsx", ".js", ".jsx"].includes(ext) && !line.endsWith(".d.ts");
+      })
+      .map((line) => path.resolve(workspaceRoot, line));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Builds a codebase index of class and function signatures.
+ * Prioritizes git ls-files for speed and automatically ignoring untracked build folders.
  */
 export function buildCodebaseIndex(
   workspaceRoot: string,
@@ -221,7 +402,13 @@ export function buildCodebaseIndex(
   const sizeLimitBytes = config.file_size_limit_kb * 1024;
   let allFiles: string[] = [];
   try {
-    allFiles = scanDirectory(workspaceRoot);
+    const trackedFiles = getGitTrackedFiles(workspaceRoot);
+    if (trackedFiles !== null) {
+      allFiles = trackedFiles;
+    } else {
+      const ignoredDirs = config.ignored_dirs || DEFAULT_IGNORED_DIRS;
+      allFiles = scanDirectory(workspaceRoot, ignoredDirs);
+    }
   } catch (err) {
     console.error("Failed to scan directory for codebase indexing:", err);
     return index;
@@ -293,6 +480,7 @@ export async function gatherContextForDiff(
   const contextBlocks: string[] = [];
   const sizeLimitBytes = config.file_size_limit_kb * 1024;
   const diffFilePaths = new Set(diff.map((f) => path.resolve(workspaceRoot, f.path)));
+  const pathsConfig = loadTsConfigPaths(workspaceRoot);
 
   async function processFile(filePath: string, currentDepth: number) {
     if (currentDepth > config.max_depth) {
@@ -317,15 +505,20 @@ export async function gatherContextForDiff(
         return;
       }
 
-      const content = await readFile(absolutePath, "utf8");
-      const sourceFile = ts.createSourceFile(absolutePath, content, ts.ScriptTarget.Latest, true);
-      const imports = getImportSpecifiers(sourceFile);
+      let imports: string[];
+      if (importSpecifiersCache.has(absolutePath)) {
+        imports = importSpecifiersCache.get(absolutePath)!;
+      } else {
+        const content = await readFile(absolutePath, "utf8");
+        const sourceFile = ts.createSourceFile(absolutePath, content, ts.ScriptTarget.Latest, true);
+        imports = getImportSpecifiers(sourceFile);
+        importSpecifiersCache.set(absolutePath, imports);
+      }
 
       for (const imp of imports) {
-        const resolved = resolveImportPath(absolutePath, imp);
+        const resolved = resolveImportPath(absolutePath, imp, workspaceRoot, pathsConfig);
         if (resolved) {
           const relResolved = path.relative(workspaceRoot, resolved).replace(/\\/g, "/");
-          // Skip if the file is already being reviewed in the diff hunk
           if (diffFilePaths.has(resolved)) {
             continue;
           }
@@ -334,8 +527,14 @@ export async function gatherContextForDiff(
             try {
               const impStat = statSync(resolved);
               if (impStat.size <= sizeLimitBytes) {
-                const impContent = await readFile(resolved, "utf8");
-                const sigs = extractSignatures(resolved, impContent);
+                let sigs = "";
+                if (signatureCache.has(resolved)) {
+                  sigs = signatureCache.get(resolved)!;
+                } else {
+                  const impContent = await readFile(resolved, "utf8");
+                  sigs = extractSignatures(resolved, impContent);
+                }
+
                 if (sigs.trim()) {
                   contextBlocks.push(`File: \`${relResolved}\`\n\`\`\`typescript\n${sigs}\n\`\`\``);
                 }
@@ -370,15 +569,14 @@ export async function gatherContextForDiff(
     const matchedSymbols = new Set<string>();
     for (const file of diff) {
       if (file.patch) {
-        // Find all alphanumeric words in the patch
-        const words = file.patch.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
+        // Unique the matched words in the patch using a Set to avoid redundant index lookups
+        const words = new Set(file.patch.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || []);
         for (const word of words) {
           if (codebaseIndex.has(word) && !matchedSymbols.has(word)) {
             const sym = codebaseIndex.get(word)!;
             const relPath = path.relative(workspaceRoot, sym.filePath).replace(/\\/g, "/");
             const relFileOfDiff = file.path.replace(/\\/g, "/");
 
-            // Avoid including signatures of the file itself or files already reviewed in the diff
             if (relPath !== relFileOfDiff && !diffFilePaths.has(sym.filePath)) {
               matchedSymbols.add(word);
               const blockKey = `File: \`${relPath}\` (referenced symbol: \`${word}\`)\n\`\`\`typescript\n${sym.signature}\n\`\`\``;
