@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## v0.7.0 - 2026-05-21
+
+### Added
+- **Context Enrichment & AST Codebase Navigation**: Traces relative and aliased imports in modified files up to `max_depth` to extract signature declarations of classes, interfaces, types, functions, and variables (excluding method/function bodies).
+- **TypeScript Path Aliases & baseUrl Support**: Resolves non-relative import paths with wildcards (e.g., `@/*`, `@utils/*`) and custom `baseUrl` mappings defined in `tsconfig.json`.
+- **Path Traversal Security Validation**: Validates all resolved import paths to ensure they reside strictly within the workspace root, preventing path traversal attacks.
+- **Fast Codebase Indexing**: Leverages `git ls-files` for extremely fast file discovery when indexing global symbols, automatically respecting `.gitignore` and falling back to manual disk traversal using custom `ignored_dirs`.
+- **Import/AST Caching**: Caches resolved import paths, file signatures, and specifiers across agents and debate rounds, avoiding redundant file system operations and parsing.
+- **Zod Schema Updates**: Added configuration schema support for `context_enrichment` including `ignored_dirs`.
+
 ## v0.6.0 - 2026-05-21
 
 ### Added

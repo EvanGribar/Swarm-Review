@@ -127,6 +127,12 @@ static_analysis:
       run: npx tsc --noEmit
       parser: regex
       regex: "(?<file>[^:]+):(?<line>\\d+):(?<column>\\d+) - (?<claim>.+)"
+
+context_enrichment:
+  enabled: true
+  max_depth: 1
+  file_size_limit_kb: 100
+  ignored_dirs: ["node_modules", ".git", "dist", "build", "out", ".next", "target", "coverage", "bin", "obj"]
 ```
 
 ### Output modes
@@ -185,6 +191,10 @@ principal: blocking until this path uses parameterized queries.
   - `parser`: log parser to use (`eslint-json` or `regex`).
   - `outputFile`: optional path to a generated report file. If provided, the linter report is read directly from this file. If omitted, the runner falls back to extracting the output file path from command line arguments (e.g. `-o <file>` or `--output-file <file>`) or stdout.
   - `regex`: the regular expression to parse output logs line-by-line (required when `parser` is `regex`). Must define `(?<file>...)`, `(?<line>...)`, and `(?<claim>...)` named capture groups, and optionally `(?<severity>...)`.
+- `context_enrichment.enabled`: whether to resolve import dependencies and pull skeletal signature context (`true` or `false`). Defaults to `true`.
+- `context_enrichment.max_depth`: how deep to recursively trace import dependencies (e.g., `1` for direct imports, `2` for imports of imports). Defaults to `1`.
+- `context_enrichment.file_size_limit_kb`: ignore dependency files larger than this size in KB to prevent context window bloat. Defaults to `100`.
+- `context_enrichment.ignored_dirs`: optional list of directories to ignore when searching for dependency files or building codebase index (e.g., `["node_modules", ".git", "dist"]`). Defaults to standard build and node directories.
 
 ## Provider Configuration
 
