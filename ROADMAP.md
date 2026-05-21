@@ -6,11 +6,8 @@ Welcome to the future of **swarm-review**! This roadmap outlines our upcoming de
 gantt
     title Swarm-Review Release Timeline
     dateFormat  YYYY-MM-DD
-    section Core Hardening
-    v0.5.x (Bugfixes & Token Tracking) : 2026-05-20, 10d
     section Future Milestones
-    v0.6.0 (Local Sandbox & Static Analysis) :active, 2026-06-01, 15d
-    v0.7.0 (Context Enrichment & AST Navigation) : 2026-06-16, 20d
+    v0.7.0 (Context Enrichment & AST Navigation) :active, 2026-06-16, 20d
     v0.8.0 (Interactive Feedback & Agent Profiles) : 2026-07-06, 15d
     v1.0.0 (Production Hardening & Cost Controls) : 2026-07-21, 20d
 ```
@@ -26,34 +23,6 @@ Our goal is to make **swarm-review** the premier open-source multi-agent PR revi
 ---
 
 ## 🚀 Milestones
-
-### 📍 Phase 1: Local Sandbox & Static Analysis Integration (v0.6.0) [COMPLETED]
-*Currently, agents review code statically, meaning they can easily miss runtime compilation or style errors, or suggest changes that conflict with lint rules.*
-
-#### Proposed Features
-- **Linter & Compiler Hook**:
-  - Run user-specified shell commands (e.g., `npm run lint`, `tsc --noEmit`, `cargo check`) inside the Action runner workspace.
-  - Automatically parse output logs using regular expressions or structured output (e.g., JUnit XML, ESLint JSON).
-- **Linter Agent Integration**:
-  - Introduce a system-level agent (e.g., `linter` or `compiler`) that consumes CLI warnings/errors and creates findings matching the Zod schema automatically.
-  - These findings will join the round 1 review and serve as ground-truth facts during debate.
-
-#### Technical Details
-We will add `static_analysis` and `commands` support to `.swarm.yml`:
-```yaml
-static_analysis:
-  enabled: true
-  commands:
-    - name: eslint
-      run: npx eslint --format json -o eslint-report.json
-      parser: eslint-json
-    - name: typescript
-      run: npx tsc --noEmit
-      parser: regex
-      regex: "(?<file>[^:]+):(?<line>\\d+):(?<column>\\d+) - (?<claim>.+)"
-```
-
----
 
 ### 📍 Phase 2: Context Enrichment & AST Codebase Navigation (v0.7.0)
 *Reviewing changes purely within diff hunks limits the agent's understanding of global state, API signatures, and cross-file side effects.*
