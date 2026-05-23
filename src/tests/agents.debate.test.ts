@@ -78,7 +78,7 @@ test("runDebateRounds uses custom system prompt and agent-specific confidence th
     globalThis.fetch = originalFetch;
   });
 
-  const requestBodies: Array<{ system?: string }> = [];
+  const requestBodies: Array<{ system?: string; messages?: Array<{ content?: string }> }> = [];
   const responses = [
     [
       {
@@ -95,7 +95,7 @@ test("runDebateRounds uses custom system prompt and agent-specific confidence th
   ];
 
   globalThis.fetch = (async (_input, init) => {
-    requestBodies.push(JSON.parse(String(init?.body ?? "{}")) as { system?: string });
+    requestBodies.push(JSON.parse(String(init?.body ?? "{}")) as { system?: string; messages?: Array<{ content?: string }> });
     const payload = responses.shift() ?? [];
     return new Response(
       JSON.stringify({ content: [{ type: "text", text: JSON.stringify(payload) }] }),
@@ -140,6 +140,7 @@ test("runDebateRounds uses custom system prompt and agent-specific confidence th
     rounds: 1,
     providerConfig: { type: "anthropic", config: { apiKey: "test-key", model: "global-model" } },
     minConfidence: 0.6,
+    developerFeedback: ["[alice]: Please recheck line 22"],
   });
 
   assert.equal(transcript.rounds.length, 2);
@@ -148,4 +149,6 @@ test("runDebateRounds uses custom system prompt and agent-specific confidence th
   assert.equal(requestBodies.length, 1);
   assert.match(requestBodies[0]?.system ?? "", /Return only JSON/);
   assert.match(requestBodies[0]?.system ?? "", /Additional agent instructions:\nSecurity debater prompt\./);
+  assert.match(requestBodies[0]?.messages?.[0]?.content ?? "", /Developer feedback and inputs:/);
+  assert.match(requestBodies[0]?.messages?.[0]?.content ?? "", /- \[alice\]: Please recheck line 22/);
 });

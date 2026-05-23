@@ -43,6 +43,8 @@ name: swarm-review
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
@@ -51,7 +53,17 @@ permissions:
 
 jobs:
   review:
+    if: >-
+      github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request &&
+      contains(github.event.comment.body, '/swarm-review') &&
+      (github.event.comment.author_association == 'OWNER' ||
+      github.event.comment.author_association == 'MEMBER' ||
+      github.event.comment.author_association == 'COLLABORATOR'))
     runs-on: ubuntu-latest
+    concurrency:
+      group: swarm-review-${{ github.event.pull_request.number || github.event.issue.number }}
+      cancel-in-progress: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,6 +78,19 @@ jobs:
 ```
 
 Then add a `.swarm.yml` file at the repository root if you want to customize the swarm.
+
+### Conversational Re-Review
+
+When the `issue_comment` trigger is enabled, repository owners, organization members, and collaborators can reply with `/swarm-review` or `/swarm-review debate` on its own line to trigger a re-review. Commands from bots, outside contributors, and other users are ignored so public comments cannot spend the repository's model budget.
+
+During a re-review, the action:
+1. Gathers all comments posted after the latest principal's review comment.
+2. Identifies developer feedback (excluding the bot's own comments).
+3. Strips the trigger commands and feeds the text directly into the debate agent prompt.
+
+This allows agents to incorporate developer feedback and debate, defend, or concede their findings based on developer responses. The action bounds collected feedback to avoid unbounded prompt growth. If a comment does not contain an exact command, the action exits immediately without calling a model.
+
+For `issue_comment` events, keep the checkout on the trusted default branch. Checking out and executing code from an untrusted pull request in a workflow that can access secrets is unsafe. The pull request diff still comes from GitHub's API; local static-analysis and context-enrichment inputs come from the trusted checkout.
 
 ## Configuration
 
@@ -174,7 +199,7 @@ principal: blocking until this path uses parameterized queries.
 ### Config fields
 
 - `provider`: optional LLM provider configuration (see Provider Configuration below).
-- `agents`: list of reviewer agents, each with a `name`, `mandate`, and optional agent-level overrides:
+- `agents`: list of reviewer agents, each with a `name`, `mandate`, optional `model`, and optional agent-level overrides:
   - `agents[].system_prompt`: custom reviewer instructions appended to the built-in structured-output prompt.
   - `agents[].min_confidence`: confidence threshold from `0` to `1`. Defaults to `debate.min_confidence`.
   - `agents[].include_patterns`: glob patterns of files this agent should review.

@@ -6,13 +6,23 @@ import { loadSwarmConfig, readInput, resolveProviderConfig } from "./config.js";
 import { runDebateRounds } from "./agents/debate.js";
 import { runReviewRound } from "./agents/review.js";
 import { synthesizePrincipalSummary } from "./agents/principal.js";
-import { upsertPullRequestComment, updateCheckRun, parsePositiveInteger, createPullRequestReview } from "./github.js";
+import { upsertPullRequestComment, updateCheckRun, parsePositiveInteger, createPullRequestReview, getDeveloperFeedback } from "./github.js";
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_API_ENDPOINT } from "./llm.js";
 import { renderDebateTranscriptMarkdown, formatInlineCommentBody } from "./format.js";
 import { runStaticAnalysis } from "./static_analysis.js";
 import { DEFAULT_PROVIDER_CONFIG, type ProviderConfig, type SwarmConfig, type Finding } from "./types.js";
 import { tokenTracker, resetTokenTracker, calculateEstimatedCost } from "./providers.js";
 import { buildCodebaseIndex } from "./context.js";
+import { isTrustedRereviewActor, parseRereviewCommand } from "./events.js";
+
+type IssueCommentEventPayload = {
+  issue?: { pull_request?: unknown };
+  comment?: {
+    body?: unknown;
+    author_association?: unknown;
+    user?: { type?: unknown };
+  };
+};
 
 
 
@@ -97,6 +107,47 @@ function buildStatsBlock(): string {
   ].join("\n");
 }
 async function main(): Promise<void> {
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  const eventName = process.env.GITHUB_EVENT_NAME;
+  let eventPayload: IssueCommentEventPayload | null = null;
+  if (eventPath && existsSync(eventPath)) {
+    try {
+      eventPayload = JSON.parse(await readFile(eventPath, "utf8")) as IssueCommentEventPayload;
+    } catch {
+      // Ignore
+    }
+  }
+
+  if (eventName === "issue_comment") {
+    const isPR = eventPayload?.issue?.pull_request !== undefined;
+    if (!isPR) {
+      console.log("Triggered by issue_comment but not on a pull request. Skipping swarm-review.");
+      return;
+    }
+
+    const comment = eventPayload?.comment;
+    const command =
+      typeof comment?.body === "string"
+        ? parseRereviewCommand(comment.body)
+        : undefined;
+    if (!command) {
+      console.log("Comment does not contain an exact '/swarm-review' command. Skipping swarm-review.");
+      return;
+    }
+
+    if (
+      !isTrustedRereviewActor(
+        comment?.author_association,
+        comment?.user?.type
+      )
+    ) {
+      console.log("The re-review command author is not a repository owner, member, or collaborator. Skipping swarm-review.");
+      return;
+    }
+
+    console.log(`Triggered by trusted conversational re-review command (${command}).`);
+  }
+
   const githubToken = readInput("github-token") ?? process.env.GITHUB_TOKEN;
   const anthropicApiKey = readInput("anthropic-api-key") ?? process.env.ANTHROPIC_API_KEY;
   const anthropicModel = readInput("anthropic-model") ?? process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL;
@@ -141,6 +192,16 @@ async function main(): Promise<void> {
 
   const combinedFindings = [...reviewFindings, ...linterFindings];
 
+  let developerFeedback: string[] = [];
+  try {
+    developerFeedback = await getDeveloperFeedback(octokit, owner, repo, pullNumber);
+    if (developerFeedback.length > 0) {
+      console.log(`Gathered ${developerFeedback.length} developer comment(s) from thread.`);
+    }
+  } catch (error) {
+    console.log(`Warning: Failed to fetch developer feedback: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   const transcript = await runDebateRounds({
     agents: swarmConfig.agents,
     diff,
@@ -152,6 +213,7 @@ async function main(): Promise<void> {
     contextEnrichment: swarmConfig.context_enrichment,
     workspaceRoot,
     codebaseIndex,
+    developerFeedback,
   });
 
   const summary = await synthesizePrincipalSummary({

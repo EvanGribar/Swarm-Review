@@ -4,6 +4,7 @@ import "./agents.principal.test.js";
 import "./agents.review.test.js";
 import "./agents.shared.test.js";
 import "./diff.test.js";
+import "./events.test.js";
 import "./format.test.js";
 import "./github.test.js";
 import "./llm.test.js";

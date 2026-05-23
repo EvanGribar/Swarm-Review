@@ -39,7 +39,8 @@ export function buildDebatePrompt(
   transcript: DebateTranscript,
   debateRound: number,
   diffConfig?: DiffConfig,
-  codeContext?: string
+  codeContext?: string,
+  developerFeedback?: string[]
 ): string {
   const parts = [
     `Agent name: ${agent.name}`,
@@ -49,6 +50,12 @@ export function buildDebatePrompt(
 
   if (codeContext && codeContext.trim()) {
     parts.push(codeContext.trim());
+  }
+
+  if (developerFeedback && developerFeedback.length > 0) {
+    parts.push(
+      `Developer feedback and inputs:\n${developerFeedback.map((f) => `- ${f}`).join("\n")}`
+    );
   }
 
   parts.push(
