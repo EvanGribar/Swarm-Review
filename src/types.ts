@@ -28,6 +28,8 @@ export const AgentConfigSchema = z.object({
   name: z.string().min(1),
   mandate: z.string().min(1),
   model: z.string().min(1).optional(),
+  system_prompt: z.string().min(1).optional(),
+  min_confidence: z.number().min(0).max(1).optional(),
   include_patterns: z.array(z.string()).optional(),
   exclude_patterns: z.array(z.string()).optional(),
 });

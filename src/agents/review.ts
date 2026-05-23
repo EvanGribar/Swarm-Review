@@ -40,11 +40,11 @@ export async function runReviewRound(input: ReviewRoundInput): Promise<Finding[]
 
       return runAgentFindingRound({
         providerConfig,
-        system,
+        system: agent.system_prompt || system,
         prompt: buildReviewPrompt(agent, filteredDiff, input.diffConfig, codeContext),
         agentName: agent.name,
         idPrefix: `review-${agent.name}`,
-        minConfidence: input.minConfidence,
+        minConfidence: agent.min_confidence ?? input.minConfidence,
       });
     })
   );

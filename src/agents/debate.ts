@@ -53,11 +53,11 @@ export async function runDebateRounds(input: DebateRoundInput): Promise<DebateTr
 
         return runAgentFindingRound({
           providerConfig,
-          system,
+          system: agent.system_prompt || system,
           prompt: buildDebatePrompt(agent, filteredDiff, currentTranscript, debateRound, input.diffConfig, codeContext),
           agentName: agent.name,
           idPrefix: `debate-${debateRound}-${agent.name}`,
-          minConfidence: input.minConfidence,
+          minConfidence: agent.min_confidence ?? input.minConfidence,
         });
       })
     );
