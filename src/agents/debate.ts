@@ -1,7 +1,7 @@
 import { buildDebatePrompt } from "../prompts.js";
 import { filterDiffForAgent } from "../diff.js";
 import type { AgentConfig, DebateTranscript, FileDiff, Finding, ProviderConfig, DiffConfig, ContextEnrichmentConfig } from "../types.js";
-import { runAgentFindingRound, resolveAgentProviderConfig } from "./shared.js";
+import { buildAgentSystemPrompt, runAgentFindingRound, resolveAgentProviderConfig } from "./shared.js";
 import { gatherContextForDiff, type IndexedSymbol } from "../context.js";
 
 export type DebateRoundInput = {
@@ -53,11 +53,11 @@ export async function runDebateRounds(input: DebateRoundInput): Promise<DebateTr
 
         return runAgentFindingRound({
           providerConfig,
-          system,
+          system: buildAgentSystemPrompt(system, agent.system_prompt),
           prompt: buildDebatePrompt(agent, filteredDiff, currentTranscript, debateRound, input.diffConfig, codeContext),
           agentName: agent.name,
           idPrefix: `debate-${debateRound}-${agent.name}`,
-          minConfidence: input.minConfidence,
+          minConfidence: agent.min_confidence ?? input.minConfidence,
         });
       })
     );

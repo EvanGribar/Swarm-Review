@@ -22,6 +22,8 @@ test("loadSwarmConfig reads a local config file", async () => {
       "agents:",
       "  - name: custom",
       "    mandate: Review the change carefully.",
+      "    system_prompt: You are a custom system prompt.",
+      "    min_confidence: 0.85",
       "debate:",
       "  rounds: 1",
       "  min_confidence: 0.7",
@@ -36,6 +38,8 @@ test("loadSwarmConfig reads a local config file", async () => {
   const config = await loadSwarmConfig(tempDir);
 
   assert.equal(config.agents[0]?.name, "custom");
+  assert.equal(config.agents[0]?.system_prompt, "You are a custom system prompt.");
+  assert.equal(config.agents[0]?.min_confidence, 0.85);
   assert.equal(config.debate.rounds, 1);
   assert.equal(config.debate.min_confidence, 0.7);
   assert.equal(config.principal.mandate, "Make the final call.");

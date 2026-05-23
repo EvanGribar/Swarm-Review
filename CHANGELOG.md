@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Per-agent `system_prompt` instructions for specialized reviewer personalities while preserving built-in output guardrails.
+- Per-agent `min_confidence` thresholds, falling back to the global debate threshold when omitted.
+
 ## v0.7.0 - 2026-05-21
 
 ### Added

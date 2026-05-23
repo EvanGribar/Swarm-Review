@@ -77,6 +77,10 @@ agents:
     mandate: >
       Review for security vulnerabilities. Look for injection risks, exposed secrets,
       broken auth, insecure defaults, and unsafe data handling.
+    system_prompt: >
+      You are a skeptical application-security reviewer. Prefer concrete exploit paths
+      over speculative concerns.
+    min_confidence: 0.8
     include_patterns: ["src/**"]
     exclude_patterns: ["*.spec.ts"]
 
@@ -170,7 +174,9 @@ principal: blocking until this path uses parameterized queries.
 ### Config fields
 
 - `provider`: optional LLM provider configuration (see Provider Configuration below).
-- `agents`: list of reviewer agents, each with a `name`, `mandate`, optional `model`, and optional agent-level file filters:
+- `agents`: list of reviewer agents, each with a `name`, `mandate`, and optional agent-level overrides:
+  - `agents[].system_prompt`: custom reviewer instructions appended to the built-in structured-output prompt.
+  - `agents[].min_confidence`: confidence threshold from `0` to `1`. Defaults to `debate.min_confidence`.
   - `agents[].include_patterns`: glob patterns of files this agent should review.
   - `agents[].exclude_patterns`: glob patterns of files this agent should ignore.
 - `debate.rounds`: how many debate rounds to run after the first-pass review.

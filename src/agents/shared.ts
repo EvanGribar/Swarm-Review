@@ -42,3 +42,14 @@ export async function runAgentFindingRound(options: AgentRoundOptions): Promise<
     .map((finding, index) => normalizeFinding(finding, options.agentName, `${options.idPrefix}-${index + 1}`))
     .filter((finding) => finding.confidence >= options.minConfidence);
 }
+
+export function buildAgentSystemPrompt(
+  defaultSystemPrompt: string,
+  customSystemPrompt: string | undefined
+): string {
+  if (!customSystemPrompt) {
+    return defaultSystemPrompt;
+  }
+
+  return `${defaultSystemPrompt}\n\nAdditional agent instructions:\n${customSystemPrompt}`;
+}
