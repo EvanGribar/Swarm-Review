@@ -43,6 +43,8 @@ name: swarm-review
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read
@@ -66,6 +68,17 @@ jobs:
 ```
 
 Then add a `.swarm.yml` file at the repository root if you want to customize the swarm.
+
+### Conversational Re-Review
+
+When the `issue_comment` trigger is enabled, developers can reply directly to the principal's comment with a command (e.g., `/swarm-review` or `/swarm-review debate`) to trigger a re-review. 
+
+During a re-review, the action:
+1. Gathers all comments posted after the latest principal's review comment.
+2. Identifies developer feedback (excluding the bot's own comments).
+3. Strips the trigger commands and feeds the text directly into the debate agent prompt.
+
+This allows agents to incorporate developer feedback and debate, defend, or concede their findings based on developer responses. If a comment is created but does not contain the `/swarm-review` trigger, the action exits immediately as a no-op to conserve LLM costs.
 
 ## Configuration
 
@@ -170,7 +183,9 @@ principal: blocking until this path uses parameterized queries.
 ### Config fields
 
 - `provider`: optional LLM provider configuration (see Provider Configuration below).
-- `agents`: list of reviewer agents, each with a `name`, `mandate`, optional `model`, and optional agent-level file filters:
+- `agents`: list of reviewer agents, each with a `name`, `mandate`, optional `model`, and optional agent-level overrides:
+  - `agents[].system_prompt`: optional custom system prompt or personality override for the agent.
+  - `agents[].min_confidence`: optional agent-level confidence threshold override (falls back to `debate.min_confidence`).
   - `agents[].include_patterns`: glob patterns of files this agent should review.
   - `agents[].exclude_patterns`: glob patterns of files this agent should ignore.
 - `debate.rounds`: how many debate rounds to run after the first-pass review.

@@ -136,3 +136,58 @@ export async function createPullRequestReview(
     })),
   });
 }
+
+export async function getDeveloperFeedback(
+  octokit: Octokit,
+  owner: string,
+  repo: string,
+  pullNumber: number
+): Promise<string[]> {
+  const [comments, authenticatedUser] = await Promise.all([
+    octokit.paginate(octokit.rest.issues.listComments, {
+      owner,
+      repo,
+      issue_number: pullNumber,
+      per_page: 100,
+    }),
+    octokit.rest.users.getAuthenticated()
+      .then((res) => res.data)
+      .catch(() => null),
+  ]);
+
+  const botLogin = authenticatedUser?.login;
+
+  const latestBotCommentIndex = comments.reduce((latestIdx, comment, idx) => {
+    const isBot =
+      comment.body?.includes(MANAGED_COMMENT_MARKER) ||
+      (comment.body?.startsWith("## swarm-review") &&
+        (comment.user?.type === "Bot" || (botLogin && comment.user?.login === botLogin)));
+    return isBot ? idx : latestIdx;
+  }, -1);
+
+  if (latestBotCommentIndex === -1) {
+    return [];
+  }
+
+  const feedbackComments = comments.slice(latestBotCommentIndex + 1);
+  const developerFeedback: string[] = [];
+
+  for (const comment of feedbackComments) {
+    if ((botLogin && comment.user?.login === botLogin) || comment.body?.includes(MANAGED_COMMENT_MARKER)) {
+      continue;
+    }
+
+    const login = comment.user?.login ?? "developer";
+    const body = comment.body ?? "";
+    const cleanedBody = body
+      .replace(/\/swarm-review\s+debate\b/g, "")
+      .replace(/\/swarm-review\b/g, "")
+      .trim();
+
+    if (cleanedBody.length > 0) {
+      developerFeedback.push(`[${login}]: ${cleanedBody}`);
+    }
+  }
+
+  return developerFeedback;
+}

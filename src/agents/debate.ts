@@ -15,6 +15,7 @@ export type DebateRoundInput = {
   contextEnrichment?: ContextEnrichmentConfig;
   workspaceRoot?: string;
   codebaseIndex?: Map<string, IndexedSymbol>;
+  developerFeedback?: string[];
 };
 
 export async function runDebateRounds(input: DebateRoundInput): Promise<DebateTranscript> {
@@ -54,7 +55,7 @@ export async function runDebateRounds(input: DebateRoundInput): Promise<DebateTr
         return runAgentFindingRound({
           providerConfig,
           system: agent.system_prompt || system,
-          prompt: buildDebatePrompt(agent, filteredDiff, currentTranscript, debateRound, input.diffConfig, codeContext),
+          prompt: buildDebatePrompt(agent, filteredDiff, currentTranscript, debateRound, input.diffConfig, codeContext, input.developerFeedback),
           agentName: agent.name,
           idPrefix: `debate-${debateRound}-${agent.name}`,
           minConfidence: agent.min_confidence ?? input.minConfidence,

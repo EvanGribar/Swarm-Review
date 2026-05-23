@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parsePositiveInteger, upsertPullRequestComment, updateCheckRun } from "../github.js";
+import { parsePositiveInteger, upsertPullRequestComment, updateCheckRun, getDeveloperFeedback } from "../github.js";
 
 type MockComment = {
   id: number;
@@ -106,4 +106,58 @@ test("parsePositiveInteger accepts only positive integer strings", () => {
   assert.equal(parsePositiveInteger(""), undefined);
   assert.equal(parsePositiveInteger(" 42 "), undefined);
   assert.equal(parsePositiveInteger("9007199254740992"), undefined);
+});
+
+test("getDeveloperFeedback gathers, filters, and formats comments after the latest bot comment", async () => {
+  const { octokit } = createOctokitMock([
+    {
+      id: 1,
+      body: "early developer comment - should be ignored",
+      user: { type: "User", login: "alice" },
+    },
+    {
+      id: 2,
+      body: "## swarm-review\n\nbot summary comment\n\n<!-- swarm-review:managed-comment -->",
+      user: { type: "User", login: "swarm-bot" },
+    },
+    {
+      id: 3,
+      body: "another bot reply - should be ignored",
+      user: { type: "User", login: "swarm-bot" },
+    },
+    {
+      id: 4,
+      body: "/swarm-review debate\nWait, check line 24. Security agent is incorrect.",
+      user: { type: "User", login: "bob" },
+    },
+    {
+      id: 5,
+      body: "   /swarm-review   ",
+      user: { type: "User", login: "charlie" }, // should be cleaned to empty and ignored
+    },
+    {
+      id: 6,
+      body: "I agree with Bob.",
+      user: { type: "User", login: "alice" },
+    },
+  ]);
+
+  const feedback = await getDeveloperFeedback(octokit as never, "owner", "repo", 12);
+
+  assert.equal(feedback.length, 2);
+  assert.equal(feedback[0], "[bob]: Wait, check line 24. Security agent is incorrect.");
+  assert.equal(feedback[1], "[alice]: I agree with Bob.");
+});
+
+test("getDeveloperFeedback returns empty if no bot comment is found", async () => {
+  const { octokit } = createOctokitMock([
+    {
+      id: 1,
+      body: "early developer comment",
+      user: { type: "User", login: "alice" },
+    },
+  ]);
+
+  const feedback = await getDeveloperFeedback(octokit as never, "owner", "repo", 12);
+  assert.equal(feedback.length, 0);
 });

@@ -3,6 +3,8 @@ name: swarm-review-example
 on:
   pull_request:
     types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
 
 permissions:
   contents: read

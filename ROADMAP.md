@@ -7,9 +7,9 @@ gantt
     title Swarm-Review Release Timeline
     dateFormat  YYYY-MM-DD
     section Future Milestones
-    v0.8.0 (Interactive Feedback & Agent Profiles) :active, 2026-07-06, 15d
-    v1.0.0 (Production Hardening & Cost Controls) : 2026-07-21, 20d
+    v1.0.0 (Production Hardening & Cost Controls) :active, 2026-07-21, 20d
     v1.1.0 (Integration Framework & Web UI Dashboard) : 2026-08-10, 20d
+    v1.2.0 (IDE Extensions & Advanced Context) : 2026-08-30, 20d
 ```
 
 ---
@@ -23,18 +23,6 @@ Our goal is to make **swarm-review** the premier open-source multi-agent PR revi
 ---
 
 ## 🚀 Milestones
-
-### 📍 Phase 3: Interactive Feedback Loops & Agent Tuning (v0.8.0)
-*Currently, the review is a one-way street. Users should be able to clarify questions, dispute findings, or instruct agents to re-evaluate their recommendations.*
-
-#### Proposed Features
-- **Conversational Re-Review**:
-  - Trigger reviews by replying directly to the principal's comment with a command (e.g., `/swarm-review debate`).
-  - Retrieve the comment thread from GitHub, parse the developer's inputs, and feed them back to the debate agent prompt.
-- **Custom Agent System Prompts**:
-  - Support setting a custom system prompt or "personality" override for each agent.
-- **Confidence Calibration**:
-  - Introduce fine-grained thresholds to prevent noise and ensure that suggestions are only highlighted if they exceed the target confidence.
 
 ---
 
@@ -82,6 +70,19 @@ static_analysis:
   - A lightweight local web app to view complex debates interactively, trace decision paths, and inspect code signatures side-by-side.
 - **Pluggable Agent Packages**:
   - Support importing third-party agent rosters and custom prompts from npm packages or external URLs.
+
+---
+
+### 📍 Phase 6: IDE Extensions & Advanced Context (v1.2.0)
+*Integrating review cycles directly into developers' inner-loop development workspaces.*
+
+#### Proposed Features
+- **VS Code & Cursor Extensions**:
+  - Run the review swarm locally on modified files directly inside the editor before committing/pushing.
+- **Language Server (LSP) Code Graph Context**:
+  - Parse deep dependency relationships across the entire codebase to understand the impact of PR changes globally.
+- **Branch-Specific Policy Rules**:
+  - Define customized rules and agent assignments depending on the target branch (e.g., stricter security checks on `release` or `main`).
 
 ---
 
