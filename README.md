@@ -415,6 +415,8 @@ provider:
       X-Custom-Header: value
 ```
 
+`baseURL` may be an API root such as `https://your-provider.com/v1` or the full `/chat/completions` endpoint.
+
 ### Legacy Mode
 
 If you don't configure a provider in `.swarm.yml`, the action uses the legacy inputs:

@@ -34,6 +34,28 @@ function addJitter(ms: number): number {
   return ms + jitter;
 }
 
+function appendEndpointPath(baseURL: string, suffix: string): string {
+  const url = new URL(baseURL);
+  const path = url.pathname.replace(/\/+$/, "");
+  if (!path.endsWith(suffix)) {
+    url.pathname = `${path}${suffix}`;
+  }
+  return url.toString();
+}
+
+function resolveAnthropicEndpoint(baseURL?: string): string {
+  const endpoint = baseURL || "https://api.anthropic.com/v1/messages";
+  const path = new URL(endpoint).pathname.replace(/\/+$/, "");
+  if (path.endsWith("/messages")) {
+    return new URL(endpoint).toString();
+  }
+  return appendEndpointPath(endpoint, path.endsWith("/v1") ? "/messages" : "/v1/messages");
+}
+
+function resolveChatCompletionsEndpoint(baseURL: string): string {
+  return appendEndpointPath(baseURL, "/chat/completions");
+}
+
 export type ModelUsage = {
   inputTokens: number;
   outputTokens: number;
@@ -122,7 +144,7 @@ class AnthropicProvider implements LLMProvider {
   constructor(private config: AnthropicConfig) {}
 
   async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = this.config.baseURL || "https://api.anthropic.com/v1/messages";
+    const endpoint = resolveAnthropicEndpoint(this.config.baseURL);
     let lastError: Error | undefined;
 
     for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
@@ -203,7 +225,9 @@ class OpenAIProvider implements LLMProvider {
   constructor(private config: OpenAIConfig) {}
 
   async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = this.config.baseURL || "https://api.openai.com/v1/chat/completions";
+    const endpoint = resolveChatCompletionsEndpoint(
+      this.config.baseURL || "https://api.openai.com/v1/chat/completions"
+    );
     let lastError: Error | undefined;
 
     for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
@@ -357,7 +381,7 @@ class OpenClawProvider implements LLMProvider {
   constructor(private config: OpenClawConfig) {}
 
   async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = `${this.config.baseURL}/chat/completions`;
+    const endpoint = resolveChatCompletionsEndpoint(this.config.baseURL);
     let lastError: Error | undefined;
 
     for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
@@ -433,7 +457,7 @@ class HermesProvider implements LLMProvider {
   constructor(private config: HermesConfig) {}
 
   async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = `${this.config.baseURL}/chat/completions`;
+    const endpoint = resolveChatCompletionsEndpoint(this.config.baseURL);
     let lastError: Error | undefined;
 
     for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
@@ -1059,7 +1083,7 @@ class CustomProvider implements LLMProvider {
           headers["authorization"] = `Bearer ${this.config.apiKey}`;
         }
 
-        const response = await fetch(this.config.baseURL, {
+        const response = await fetch(resolveChatCompletionsEndpoint(this.config.baseURL), {
           method: "POST",
           headers,
           body: JSON.stringify({
