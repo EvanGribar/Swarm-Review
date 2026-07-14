@@ -1,7 +1,7 @@
 import { buildReviewPrompt } from "../prompts.js";
 import { filterDiffForAgent } from "../diff.js";
 import type { AgentConfig, FileDiff, Finding, ProviderConfig, DiffConfig, ContextEnrichmentConfig } from "../types.js";
-import { runAgentFindingRound, resolveAgentProviderConfig } from "./shared.js";
+import { buildAgentSystemPrompt, runAgentFindingRound, resolveAgentProviderConfig } from "./shared.js";
 import { gatherContextForDiff, type IndexedSymbol } from "../context.js";
 
 export type ReviewRoundInput = {
@@ -40,11 +40,11 @@ export async function runReviewRound(input: ReviewRoundInput): Promise<Finding[]
 
       return runAgentFindingRound({
         providerConfig,
-        system,
+        system: buildAgentSystemPrompt(system, agent.system_prompt),
         prompt: buildReviewPrompt(agent, filteredDiff, input.diffConfig, codeContext),
         agentName: agent.name,
         idPrefix: `review-${agent.name}`,
-        minConfidence: input.minConfidence,
+        minConfidence: agent.min_confidence ?? input.minConfidence,
       });
     })
   );
