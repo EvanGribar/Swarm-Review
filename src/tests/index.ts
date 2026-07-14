@@ -9,6 +9,7 @@ import "./events.test.js";
 import "./format.test.js";
 import "./github.test.js";
 import "./llm.test.js";
+import "./metadata.test.js";
 import "./prompts.test.js";
 import "./providers.test.js";
 import "./static_analysis.test.js";

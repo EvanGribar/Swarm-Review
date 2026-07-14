@@ -4,7 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## v1.0.0 - 2026-07-14
+
 ### Added
+- A committed, standalone GitHub Action bundle with CI enforcement against stale generated output.
 - Per-agent `system_prompt` instructions for specialized reviewer personalities while preserving built-in output guardrails.
 - Per-agent `min_confidence` thresholds, falling back to the global debate threshold when omitted.
 - Trusted conversational re-reviews triggered by exact `/swarm-review` commands on pull requests.
@@ -21,6 +24,7 @@ All notable changes to this project are documented in this file.
 - Normalized Anthropic and OpenAI-compatible base URLs to their request endpoints while preserving full endpoint URLs.
 - Resolved documented `$ENV_VAR` provider API-key references instead of sending them as literal credentials.
 - Corrected legacy provider documentation and action author metadata.
+- Corrected diff prompt budget accounting for metadata, exclusions, and separators.
 
 ## v0.7.0 - 2026-05-21
 

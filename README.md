@@ -510,12 +510,13 @@ Tune these values based on repository size and expected review depth.
 
 ## Release Process
 
-Releases are delivered in stage-specific pull requests so each risk domain is reviewed independently. This keeps reviews focused and makes rollback decisions straightforward. For example, a release cycle typically includes:
+Releases are delivered in focused pull requests so each risk domain can be reviewed and rolled back independently. To publish a stable release:
 
-1. Stability and safety hardening.
-2. Diff scaling and runtime reliability.
-3. Coverage expansion for key helpers.
-4. Documentation and release metadata.
+1. Merge the release metadata PR after CI passes and create the matching `vX.Y.Z` tag and GitHub release.
+2. The release workflow checks that the tag matches `package.json`, runs the full tests, and verifies the committed bundle.
+3. For stable releases, the workflow advances the floating major tag (for example, `v1`) to the verified release commit.
+
+Consumers should pin `EvanGribar/Swarm-Review@v1` for compatible v1 updates or a full tag such as `@v1.0.0` for an immutable version.
 
 
 ## Project Layout
