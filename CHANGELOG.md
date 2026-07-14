@@ -8,7 +8,7 @@ All notable changes to this project are documented in this file.
 - Per-agent `system_prompt` instructions for specialized reviewer personalities while preserving built-in output guardrails.
 - Per-agent `min_confidence` thresholds, falling back to the global debate threshold when omitted.
 - Trusted conversational re-reviews triggered by exact `/swarm-review` commands on pull requests.
-- Strict per-run model budgets with concurrency-safe worst-case reservations, configurable output caps, and same-provider fallback models.
+- Strict per-run model budgets with concurrency-safe reservations, successful-call settlement, configurable output caps, and same-provider fallback models.
 - Budget-aware degradation that skips unaffordable reviewer calls, defers unsynthesized findings for manual review, and prevents automatic approval after exhaustion.
 
 ### Security

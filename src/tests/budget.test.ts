@@ -6,6 +6,7 @@ import {
   configureBudget,
   getBudgetStatus,
   reserveBudgetedCall,
+  settleSuccessfulBudgetedCall,
 } from "../budget.js";
 import type { ProviderConfig } from "../types.js";
 import { runAgentFindingRound } from "../agents/shared.js";
@@ -42,6 +43,27 @@ test("budget guard switches to a configured cheaper fallback", (t) => {
   assert.equal(getBudgetStatus().fallbackCalls, 1);
 });
 
+test("successful calls release unused output reservation conservatively", (t) => {
+  t.after(() => configureBudget(undefined));
+  configureBudget({ max_cost_usd: 1, max_output_tokens: 1_000 });
+
+  const reservation = reserveBudgetedCall(primary, "system", "prompt", 1_000);
+  const before = getBudgetStatus().committedUpperBoundUsd;
+  settleSuccessfulBudgetedCall(reservation, "short response");
+
+  assert.ok(getBudgetStatus().committedUpperBoundUsd < before);
+  assert.ok(getBudgetStatus().committedUpperBoundUsd > 0);
+});
+
+test("unsettled failed calls retain their worst-case reservation", (t) => {
+  t.after(() => configureBudget(undefined));
+  configureBudget({ max_cost_usd: 1, max_output_tokens: 1_000 });
+
+  const reservation = reserveBudgetedCall(primary, "system", "prompt", 1_000);
+
+  assert.equal(getBudgetStatus().committedUpperBoundUsd, reservation.reservedUsd);
+});
+
 test("budget guard refuses calls that would exceed the shared run cap", (t) => {
   t.after(() => configureBudget(undefined));
   configureBudget({ max_cost_usd: 0.001, max_output_tokens: 1_000 });
@@ -64,7 +86,7 @@ test("budget guard rejects unknown pricing unless a known fallback fits", (t) =>
 
   assert.throws(
     () => reserveBudgetedCall(unknown, "system", "prompt", 1_000),
-    /configured.*budget cannot cover another call/i
+    /pricing is unknown.*strict cost cap/i
   );
 });
 

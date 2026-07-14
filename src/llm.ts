@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { FindingSchema, RawFindingSchema, type Finding, type RawFinding, type ProviderConfig } from "./types.js";
 import { createProvider, type LLMProvider } from "./providers.js";
-import { reserveBudgetedCall } from "./budget.js";
+import { reserveBudgetedCall, settleSuccessfulBudgetedCall } from "./budget.js";
 
 const ANTHROPIC_MESSAGES_ENDPOINT = "https://api.anthropic.com/v1/messages";
 
@@ -57,7 +57,9 @@ export async function callLLM(
 ): Promise<string> {
   const reservation = reserveBudgetedCall(providerConfig, system, prompt, maxTokens);
   const provider = createProvider(reservation.providerConfig);
-  return provider.call(system, prompt, reservation.maxTokens);
+  const responseText = await provider.call(system, prompt, reservation.maxTokens);
+  settleSuccessfulBudgetedCall(reservation, responseText);
+  return responseText;
 }
 
 export async function callLLMStructured<T>(
