@@ -1,7 +1,10 @@
 {
   "name": "swarm-review",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "description": "GitHub Action that runs a multi-agent pull request review swarm with structured debate and principal synthesis.",
   "license": "MIT",
   "type": "commonjs",

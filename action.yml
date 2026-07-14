@@ -6,14 +6,14 @@ inputs:
     description: GitHub token with permission to comment on pull requests.
     required: true
   anthropic-api-key:
-    description: Legacy: API key for Anthropic. For multi-provider support, configure provider in .swarm.yml instead.
+    description: "Legacy: API key for Anthropic. For multi-provider support, configure provider in .swarm.yml instead."
     required: false
   anthropic-model:
-    description: Legacy: Model name for Anthropic. For multi-provider support, configure provider in .swarm.yml instead.
+    description: "Legacy: Model name for Anthropic. For multi-provider support, configure provider in .swarm.yml instead."
     required: false
     default: claude-3-5-sonnet-latest
   api-endpoint:
-    description: Custom API endpoint for Anthropic-compatible providers (e.g., OpenRouter, local LLM).
+    description: Optional API base URL or full messages endpoint for an Anthropic-compatible service.
     required: false
   config-path:
     description: Path to the swarm configuration file. Use this to configure providers, agents, and debate settings.
