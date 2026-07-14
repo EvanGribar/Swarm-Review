@@ -221,6 +221,12 @@ export const ContextEnrichmentConfigSchema = z.object({
   ignored_dirs: z.array(z.string()).optional(),
 });
 
+export const BudgetConfigSchema = z.object({
+  max_cost_usd: z.number().positive(),
+  fallback_model: z.string().min(1).optional(),
+  max_output_tokens: z.number().int().positive().max(32_768).default(4_096),
+});
+
 export const SwarmConfigSchema = z.object({
   agents: z.array(AgentConfigSchema).min(1).default(DEFAULT_AGENTS),
   debate: DebateConfigSchema.default(DEFAULT_DEBATE_CONFIG),
@@ -240,6 +246,7 @@ export const SwarmConfigSchema = z.object({
     include_patterns: [],
   }),
   provider: ProviderConfigSchema.optional(),
+  budget: BudgetConfigSchema.optional(),
   static_analysis: StaticAnalysisConfigSchema.default({
     enabled: false,
     commands: [],
@@ -257,6 +264,7 @@ export type SwarmConfig = z.infer<typeof SwarmConfigSchema>;
 export type StaticAnalysisCommand = z.infer<typeof StaticAnalysisCommandSchema>;
 export type StaticAnalysisConfig = z.infer<typeof StaticAnalysisConfigSchema>;
 export type ContextEnrichmentConfig = z.infer<typeof ContextEnrichmentConfigSchema>;
+export type BudgetConfig = z.infer<typeof BudgetConfigSchema>;
 
 
 export const FileDiffSchema = z.object({

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { FindingSchema, RawFindingSchema, type Finding, type RawFinding, type ProviderConfig } from "./types.js";
 import { createProvider, type LLMProvider } from "./providers.js";
+import { reserveBudgetedCall } from "./budget.js";
 
 const ANTHROPIC_MESSAGES_ENDPOINT = "https://api.anthropic.com/v1/messages";
 
@@ -54,8 +55,9 @@ export async function callLLM(
   prompt: string,
   maxTokens = 4096
 ): Promise<string> {
-  const provider = createProvider(providerConfig);
-  return provider.call(system, prompt, maxTokens);
+  const reservation = reserveBudgetedCall(providerConfig, system, prompt, maxTokens);
+  const provider = createProvider(reservation.providerConfig);
+  return provider.call(system, prompt, reservation.maxTokens);
 }
 
 export async function callLLMStructured<T>(
@@ -68,9 +70,11 @@ export async function callLLMStructured<T>(
   let lastResponseText = "";
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
+    // Provider/network errors are not schema errors and must not trigger another paid call.
+    const rawText = await callLLM(providerConfig, system, currentPrompt);
+    lastResponseText = rawText;
+
     try {
-      const rawText = await callLLM(providerConfig, system, currentPrompt);
-      lastResponseText = rawText;
       const jsonText = extractJsonText(rawText);
       const parsed = JSON.parse(jsonText) as unknown;
       return schema.parse(parsed);

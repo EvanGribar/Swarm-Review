@@ -115,3 +115,29 @@ test("callLLMStructured self-heals after validation failure", async (t) => {
   assert.ok(promptsSent[1].includes("CRITICAL: Your previous response failed validation and could not be parsed."));
   assert.ok(promptsSent[1].includes("wrongField"));
 });
+
+test("callLLMStructured does not repeat paid calls for provider errors", async (t) => {
+  const { callLLMStructured } = await import("../llm.js");
+  const { z } = await import("zod");
+  const originalFetch = globalThis.fetch;
+  let attempts = 0;
+  globalThis.fetch = (async () => {
+    attempts += 1;
+    return new Response("bad request", { status: 400 });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await assert.rejects(
+    () =>
+      callLLMStructured(
+        { type: "anthropic", config: { apiKey: "test-key", model: "claude-3-5-sonnet-latest" } },
+        "system",
+        "prompt",
+        z.array(z.unknown())
+      ),
+    /Anthropic request failed with 400/
+  );
+  assert.equal(attempts, 1);
+});

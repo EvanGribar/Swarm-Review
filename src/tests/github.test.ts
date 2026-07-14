@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parsePositiveInteger, upsertPullRequestComment, updateCheckRun, getDeveloperFeedback } from "../github.js";
+import { parsePositiveInteger, resolveReviewEvent, upsertPullRequestComment, updateCheckRun, getDeveloperFeedback } from "../github.js";
 
 type MockComment = {
   id: number;
@@ -212,4 +212,24 @@ test("getDeveloperFeedback bounds comment count and total prompt size", async ()
   assert.ok(feedback.length <= 20);
   assert.ok(feedback.reduce((total, entry) => total + entry.length, 0) <= 20_000);
   assert.match(feedback[0] ?? "", /^\[user-5\]:/);
+});
+
+test("resolveReviewEvent never approves after budget exhaustion", () => {
+  assert.equal(resolveReviewEvent("APPROVE", [], true), "COMMENT");
+  assert.equal(resolveReviewEvent("AUTO", [], true), "COMMENT");
+});
+
+test("resolveReviewEvent derives automatic review decisions", () => {
+  const finding = {
+    id: "finding-1",
+    agent: "security",
+    severity: "blocking" as const,
+    file: "src/app.ts",
+    line: 1,
+    claim: "Unsafe behavior.",
+    confidence: 0.9,
+  };
+
+  assert.equal(resolveReviewEvent("AUTO", [], false), "APPROVE");
+  assert.equal(resolveReviewEvent("AUTO", [{ finding }], false), "REQUEST_CHANGES");
 });

@@ -6,7 +6,7 @@ import { loadSwarmConfig, readInput, resolveProviderConfig } from "./config.js";
 import { runDebateRounds } from "./agents/debate.js";
 import { runReviewRound } from "./agents/review.js";
 import { synthesizePrincipalSummary } from "./agents/principal.js";
-import { upsertPullRequestComment, updateCheckRun, parsePositiveInteger, createPullRequestReview, getDeveloperFeedback } from "./github.js";
+import { upsertPullRequestComment, updateCheckRun, parsePositiveInteger, createPullRequestReview, getDeveloperFeedback, resolveReviewEvent } from "./github.js";
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_API_ENDPOINT } from "./llm.js";
 import { renderDebateTranscriptMarkdown, formatInlineCommentBody } from "./format.js";
 import { runStaticAnalysis } from "./static_analysis.js";
@@ -14,6 +14,7 @@ import { DEFAULT_PROVIDER_CONFIG, type ProviderConfig, type SwarmConfig, type Fi
 import { tokenTracker, resetTokenTracker, calculateEstimatedCost } from "./providers.js";
 import { buildCodebaseIndex } from "./context.js";
 import { isTrustedRereviewActor, parseRereviewCommand } from "./events.js";
+import { configureBudget, getBudgetStatus } from "./budget.js";
 
 type IssueCommentEventPayload = {
   issue?: { pull_request?: unknown };
@@ -95,6 +96,13 @@ function buildStatsBlock(): string {
   const costStr = hasUnknown
     ? `$${cost.toFixed(4)}+ USD (contains unknown model pricing)`
     : `$${cost.toFixed(4)} USD`;
+  const budget = getBudgetStatus();
+  const budgetLines = budget.config
+    ? [
+        `> - **Budget upper bound committed**: $${budget.committedUpperBoundUsd.toFixed(4)} / $${budget.config.max_cost_usd.toFixed(4)} USD`,
+        `> - **Fallback / skipped calls**: ${budget.fallbackCalls} / ${budget.skippedCalls}`,
+      ]
+    : [];
 
   return [
     `> [!NOTE]`,
@@ -102,6 +110,7 @@ function buildStatsBlock(): string {
     `> - **Total LLM Calls**: ${tokenTracker.totalCalls}`,
     `> - **Total Tokens**: ${totalInput.toLocaleString()} input / ${totalOutput.toLocaleString()} output`,
     `> - **Estimated Cost**: ${costStr}`,
+    ...budgetLines,
     `> - **Usage Breakdown**:`,
     ...breakdown,
   ].join("\n");
@@ -171,6 +180,7 @@ async function main(): Promise<void> {
   console.log(`Using provider: ${providerConfig.type}`);
 
   resetTokenTracker();
+  configureBudget(swarmConfig.budget);
 
   const diff = await fetchPullRequestDiff(octokit, owner, repo, pullNumber);
   const linterFindings = await runStaticAnalysis(swarmConfig.static_analysis, workspaceRoot);
@@ -256,21 +266,11 @@ async function main(): Promise<void> {
     }
   }
 
-  let actualEvent: "COMMENT" | "APPROVE" | "REQUEST_CHANGES" = "COMMENT";
-  if (reviewEvent === "APPROVE") {
-    actualEvent = "APPROVE";
-  } else if (reviewEvent === "REQUEST_CHANGES") {
-    actualEvent = "REQUEST_CHANGES";
-  } else if (reviewEvent === "AUTO") {
-    const hasBlocking = acceptedFindings.some((item) => item.finding.severity === "blocking");
-    if (hasBlocking) {
-      actualEvent = "REQUEST_CHANGES";
-    } else if (acceptedFindings.length === 0) {
-      actualEvent = "APPROVE";
-    } else {
-      actualEvent = "COMMENT";
-    }
-  }
+  const actualEvent = resolveReviewEvent(
+    reviewEvent,
+    acceptedFindings,
+    getBudgetStatus().exhausted
+  );
 
   if (isInline || reviewEvent !== "COMMENT") {
     const validLinesMap = new Map<string, Set<number>>();
