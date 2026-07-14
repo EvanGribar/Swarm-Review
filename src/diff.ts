@@ -128,20 +128,23 @@ export function formatFileDiffs(files: FileDiff[], options?: Partial<DiffFormatO
     }
     return !excludeRegexes.some((r) => r.test(file.path));
   });
+  const omittedByPatterns = files.length - filteredFiles.length;
 
-  // Pre-calculate metadata to establish the initial budget overhead.
-  // We use placeholder counts that won't significantly change the length.
+  // Reserve the longest possible count values so the final metadata cannot
+  // exceed the budget calculation as files are omitted.
+  const countPlaceholder = String(files.length);
   const metadataPlaceholder = [
     "### Diff Budget",
     `- total_files: ${files.length}`,
-    `- included_files: 888`,
-    `- omitted_files: 888`,
+    `- included_files: ${countPlaceholder}`,
+    `- omitted_files: ${countPlaceholder}`,
+    `- excluded_by_patterns: ${omittedByPatterns}`,
     `- max_files: ${settings.max_files}`,
     `- max_patch_chars_per_file: ${settings.max_patch_chars_per_file}`,
     `- max_total_chars: ${settings.max_total_chars}`,
   ].join("\n");
 
-  let remainingChars = settings.max_total_chars - metadataPlaceholder.length - SEPARATOR.length;
+  let remainingChars = settings.max_total_chars - metadataPlaceholder.length;
   const selectedFiles = filteredFiles.slice(0, settings.max_files);
   const renderedFiles: string[] = [];
 
@@ -172,10 +175,7 @@ export function formatFileDiffs(files: FileDiff[], options?: Partial<DiffFormatO
     remainingChars -= rendered.length + SEPARATOR.length;
   }
 
-  const omittedByFileLimit = Math.max(0, filteredFiles.length - selectedFiles.length);
-  const omittedByCharBudget = Math.max(0, selectedFiles.length - renderedFiles.length);
-  const omittedByPatterns = files.length - filteredFiles.length;
-  const omittedCount = omittedByFileLimit + omittedByCharBudget + omittedByPatterns;
+  const omittedCount = files.length - renderedFiles.length;
 
   const metadata = [
     "### Diff Budget",
