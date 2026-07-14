@@ -32,3 +32,9 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - name: Bundle action
+        run: npm run bundle
+
+      - name: Verify committed action bundle
+        run: git diff --exit-code -- dist/
