@@ -1,6 +1,6 @@
 name: swarm-review
 description: Run a swarm of AI reviewers on pull requests with multi-provider support (Anthropic, OpenAI, OpenRouter, custom).
-author: GitHub Copilot
+author: EvanGribar
 inputs:
   github-token:
     description: GitHub token with permission to comment on pull requests.
@@ -19,6 +19,9 @@ inputs:
     description: Path to the swarm configuration file. Use this to configure providers, agents, and debate settings.
     required: false
     default: .swarm.yml
+  pull-number:
+    description: Optional pull request number when the event payload does not identify one.
+    required: false
   check-run-id:
     description: Optional existing check run ID to update after the review.
     required: false

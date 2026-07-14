@@ -123,7 +123,7 @@ export async function callAnthropic(
   apiEndpoint = DEFAULT_API_ENDPOINT
 ): Promise<string> {
   return callLLM(
-    { type: "anthropic", config: { apiKey, model } },
+    { type: "anthropic", config: { apiKey, model, baseURL: apiEndpoint } },
     system,
     prompt,
     maxTokens
@@ -139,7 +139,7 @@ export async function callAnthropicStructured<T>(
   apiEndpoint = DEFAULT_API_ENDPOINT
 ): Promise<T> {
   return callLLMStructured(
-    { type: "anthropic", config: { apiKey, model } },
+    { type: "anthropic", config: { apiKey, model, baseURL: apiEndpoint } },
     system,
     prompt,
     schema

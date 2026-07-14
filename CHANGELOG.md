@@ -15,6 +15,13 @@ All notable changes to this project are documented in this file.
 - Restrict comment-triggered paid runs to repository owners, organization members, and collaborators.
 - Bound developer-feedback context and ignore spoofed managed-comment markers from non-bot users.
 
+### Fixed
+- Declared the supported `pull-number` action input and corrected consumer workflow examples to reference the published action.
+- Wired the legacy `api-endpoint` input through Anthropic calls instead of silently ignoring it.
+- Normalized Anthropic and OpenAI-compatible base URLs to their request endpoints while preserving full endpoint URLs.
+- Resolved documented `$ENV_VAR` provider API-key references instead of sending them as literal credentials.
+- Corrected legacy provider documentation and action author metadata.
+
 ## v0.7.0 - 2026-05-21
 
 ### Added
