@@ -32,6 +32,28 @@ test("formatFileDiffs renders multiple files and large patches", () => {
   assert.match(rendered, /```diff\n\+const a = 1;\n```/);
 });
 
+test("formatFileDiffs keeps metadata and separators within the total character budget", () => {
+  const files: FileDiff[] = Array.from({ length: 1_001 }, (_, index) => ({
+    path: `src/file-${index}.ts`,
+    status: "modified",
+    additions: 1,
+    deletions: 0,
+    changes: 1,
+    patch: "+x",
+  }));
+
+  const rendered = formatFileDiffs(files, {
+    max_files: 5,
+    max_patch_chars_per_file: 100,
+    max_total_chars: 500,
+    exclude_patterns: ["src/file-0.ts"],
+  });
+
+  assert.ok(rendered.length <= 500);
+  assert.match(rendered, /total_files: 1001/);
+  assert.match(rendered, /excluded_by_patterns: 1/);
+});
+
 test("globToRegex converts glob patterns correctly", () => {
   const r1 = globToRegex("*.spec.ts");
   assert.ok(r1.test("foo.spec.ts"));
