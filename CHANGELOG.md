@@ -7,6 +7,11 @@ All notable changes to this project are documented in this file.
 ### Added
 - Per-agent `system_prompt` instructions for specialized reviewer personalities while preserving built-in output guardrails.
 - Per-agent `min_confidence` thresholds, falling back to the global debate threshold when omitted.
+- Trusted conversational re-reviews triggered by exact `/swarm-review` commands on pull requests.
+
+### Security
+- Restrict comment-triggered paid runs to repository owners, organization members, and collaborators.
+- Bound developer-feedback context and ignore spoofed managed-comment markers from non-bot users.
 
 ## v0.7.0 - 2026-05-21
 
