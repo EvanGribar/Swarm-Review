@@ -239,6 +239,8 @@ principal: blocking until this path uses parameterized queries.
 
 swarm-review supports multiple LLM providers through the `provider` field in `.swarm.yml`. If not specified, the action falls back to the legacy `anthropic-api-key` input.
 
+Provider `apiKey` values may reference an environment variable as `$NAME` or `${NAME}`. Set that environment variable on the action step from a GitHub secret; swarm-review resolves the reference at runtime and fails clearly if it is missing. Literal keys are supported for local testing but should never be committed.
+
 ### Anthropic (default)
 
 ```yaml

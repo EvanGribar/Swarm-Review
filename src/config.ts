@@ -27,6 +27,25 @@ export function readInput(name: string): string | undefined {
   return undefined;
 }
 
+function resolveApiKeyReference(value: string): string {
+  if (!value.startsWith("$")) {
+    return value;
+  }
+
+  const match = value.match(/^\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*))$/);
+  const environmentName = match?.[1] ?? match?.[2];
+  if (!environmentName) {
+    throw new Error(`Invalid provider API key environment reference: ${value}`);
+  }
+
+  const inputName = environmentName.toLowerCase().replace(/_/g, "-");
+  const resolvedValue = process.env[environmentName] || readInput(inputName);
+  if (!resolvedValue) {
+    throw new Error(`Provider API key environment variable ${environmentName} is not set.`);
+  }
+  return resolvedValue;
+}
+
 export function resolveProviderConfig(
   swarmConfig: SwarmConfig,
   legacyAnthropicApiKey: string | undefined,
@@ -49,7 +68,13 @@ export function resolveProviderConfig(
 
   const { type, config } = swarmConfig.provider;
   if (config.apiKey && config.apiKey.length > 0) {
-    return swarmConfig.provider;
+    return {
+      type,
+      config: {
+        ...config,
+        apiKey: resolveApiKeyReference(config.apiKey),
+      },
+    } as ProviderConfig;
   }
 
   const resolvedApiKey = readInput(`${type}-api-key`) || (type === "anthropic" ? legacyAnthropicApiKey : undefined);

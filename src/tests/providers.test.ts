@@ -56,6 +56,37 @@ test("resolveProviderConfig respects configured apiKey in swarmConfig", () => {
   assert.equal(config.config.apiKey, "config-openai-key");
 });
 
+test("resolveProviderConfig expands configured environment references", () => {
+  const swarmConfig = mockSwarmConfig({
+    provider: {
+      type: "openai",
+      config: { apiKey: "$OPENAI_API_KEY", model: "gpt-4o" },
+    },
+  });
+  process.env.INPUT_OPENAI_API_KEY = "input-openai-key";
+
+  try {
+    const config = resolveProviderConfig(swarmConfig, undefined, "claude-3-5-sonnet-latest");
+    assert.equal(config.config.apiKey, "input-openai-key");
+  } finally {
+    delete process.env.INPUT_OPENAI_API_KEY;
+  }
+});
+
+test("resolveProviderConfig rejects an unresolved environment reference", () => {
+  const swarmConfig = mockSwarmConfig({
+    provider: {
+      type: "openai",
+      config: { apiKey: "${MISSING_SWARM_TEST_KEY}", model: "gpt-4o" },
+    },
+  });
+
+  assert.throws(
+    () => resolveProviderConfig(swarmConfig, undefined, "claude-3-5-sonnet-latest"),
+    /MISSING_SWARM_TEST_KEY is not set/
+  );
+});
+
 test("resolveProviderConfig resolves missing apiKey from environment variables / inputs", () => {
   const swarmConfig = mockSwarmConfig({
     provider: {
