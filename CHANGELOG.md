@@ -18,6 +18,7 @@ All notable changes to this project are documented in this file.
 ### Fixed
 - Declared the supported `pull-number` action input and corrected consumer workflow examples to reference the published action.
 - Wired the legacy `api-endpoint` input through Anthropic calls instead of silently ignoring it.
+- Normalized Anthropic and OpenAI-compatible base URLs to their request endpoints while preserving full endpoint URLs.
 - Resolved documented `$ENV_VAR` provider API-key references instead of sending them as literal credentials.
 - Corrected legacy provider documentation and action author metadata.
 
