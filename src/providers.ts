@@ -122,7 +122,7 @@ class AnthropicProvider implements LLMProvider {
   constructor(private config: AnthropicConfig) {}
 
   async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = "https://api.anthropic.com/v1/messages";
+    const endpoint = this.config.baseURL || "https://api.anthropic.com/v1/messages";
     let lastError: Error | undefined;
 
     for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {

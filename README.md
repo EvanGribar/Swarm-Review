@@ -69,7 +69,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run swarm-review
-        uses: ./
+        uses: EvanGribar/Swarm-Review@v1
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -419,7 +419,7 @@ If you don't configure a provider in `.swarm.yml`, the action uses the legacy in
 
 ```yaml
 - name: Run swarm-review
-  uses: ./
+  uses: EvanGribar/Swarm-Review@v1
   with:
     github-token: ${{ secrets.GITHUB_TOKEN }}
     anthropic-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -433,14 +433,17 @@ provider:
   type: anthropic
   config:
     apiKey: $ANTHROPIC_API_KEY
-    model: claude-instruct-beta-5b
+    model: claude-3-5-sonnet-latest
 ```
 
 ## Action Inputs
 
 - `github-token`: GitHub token with permission to comment on pull requests.
-- `provider`: LLM provider configuration (see Provider Configuration above).
+- `anthropic-api-key`: legacy Anthropic API key; use `.swarm.yml` for other providers.
+- `anthropic-model`: optional legacy Anthropic model override.
+- `api-endpoint`: optional Anthropic-compatible messages endpoint for legacy configuration.
 - `config-path`: optional path to the swarm config file.
+- `pull-number`: optional pull request number when it cannot be resolved from the event payload.
 - `check-run-id`: optional existing check run ID to update after the review.
 - `inline`: optional override to post findings as inline review comments (`true` or `false`).
 - `review-event`: optional override for GitHub review event status (`COMMENT`, `APPROVE`, `REQUEST_CHANGES`, or `AUTO`).
@@ -483,7 +486,7 @@ npm test
 - Missing token or API key:
   - Ensure `github-token` and `anthropic-api-key` are passed to the action.
 - The action cannot resolve pull request number:
-  - Confirm the workflow runs on pull request events, or provide `pull-number` through environment input.
+  - Confirm the workflow runs on pull request events, or provide the `pull-number` action input.
 - LLM response parsing failures:
   - The run fails when the model output is not valid JSON matching the schema.
   - Retry with a stricter model instruction in your agent mandates or principal mandate.

@@ -30,7 +30,8 @@ export function readInput(name: string): string | undefined {
 export function resolveProviderConfig(
   swarmConfig: SwarmConfig,
   legacyAnthropicApiKey: string | undefined,
-  legacyAnthropicModel: string
+  legacyAnthropicModel: string,
+  legacyAnthropicEndpoint?: string
 ): ProviderConfig {
   if (!swarmConfig.provider) {
     if (!legacyAnthropicApiKey) {
@@ -38,7 +39,11 @@ export function resolveProviderConfig(
     }
     return {
       type: "anthropic",
-      config: { apiKey: legacyAnthropicApiKey, model: legacyAnthropicModel },
+      config: {
+        apiKey: legacyAnthropicApiKey,
+        model: legacyAnthropicModel,
+        ...(legacyAnthropicEndpoint ? { baseURL: legacyAnthropicEndpoint } : {}),
+      },
     };
   }
 
