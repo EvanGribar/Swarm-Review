@@ -3,6 +3,7 @@ import "./agents.debate.test.js";
 import "./agents.principal.test.js";
 import "./agents.review.test.js";
 import "./agents.shared.test.js";
+import "./budget.test.js";
 import "./diff.test.js";
 import "./events.test.js";
 import "./format.test.js";

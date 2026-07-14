@@ -63,7 +63,7 @@ export function resetTokenTracker() {
   tokenTracker.totalCalls = 0;
 }
 
-const MODEL_COSTS: Record<string, { input: number; output: number }> = {
+export const MODEL_COSTS: Record<string, { input: number; output: number }> = {
   "claude-3-5-sonnet-latest": { input: 3.0, output: 15.0 },
   "claude-3-5-sonnet-20241022": { input: 3.0, output: 15.0 },
   "claude-3-5-sonnet-20240620": { input: 3.0, output: 15.0 },
@@ -86,17 +86,24 @@ const MODEL_COSTS: Record<string, { input: number; output: number }> = {
   "gemini-1.5-flash": { input: 0.075, output: 0.30 },
 };
 
+export function getModelCostRates(model: string): { input: number; output: number } | undefined {
+  const normalizedModel = model.toLowerCase();
+  const baseModel = normalizedModel.split("/").at(-1) ?? normalizedModel;
+  const matchedKey = Object.keys(MODEL_COSTS).find(
+    (key) => key.toLowerCase() === normalizedModel || key.toLowerCase() === baseModel
+  );
+
+  return matchedKey ? MODEL_COSTS[matchedKey] : undefined;
+}
+
 export function calculateEstimatedCost(): { cost: number; hasUnknown: boolean } {
   let totalCost = 0;
   let hasUnknown = false;
 
   for (const [model, usage] of Object.entries(tokenTracker.models)) {
-    const matchedKey = Object.keys(MODEL_COSTS).find(
-      (k) => model.toLowerCase().includes(k.toLowerCase()) || k.toLowerCase().includes(model.toLowerCase())
-    );
-    
-    if (matchedKey) {
-      const rates = MODEL_COSTS[matchedKey];
+    const rates = getModelCostRates(model);
+
+    if (rates) {
       const modelCost = (usage.inputTokens * rates.input + usage.outputTokens * rates.output) / 1_000_000;
       totalCost += modelCost;
     } else {

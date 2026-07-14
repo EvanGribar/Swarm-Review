@@ -128,6 +128,11 @@ debate:
   rounds: 2
   min_confidence: 0.6
 
+budget:
+  max_cost_usd: 1.50
+  fallback_model: claude-3-5-haiku-latest
+  max_output_tokens: 4096
+
 principal:
   mandate: >
     You are the principal engineer. Read the full debate and make final calls.
@@ -204,6 +209,9 @@ principal: blocking until this path uses parameterized queries.
   - `agents[].min_confidence`: confidence threshold from `0` to `1`. Defaults to `debate.min_confidence`.
   - `agents[].include_patterns`: glob patterns of files this agent should review.
   - `agents[].exclude_patterns`: glob patterns of files this agent should ignore.
+- `budget.max_cost_usd`: optional strict per-run spend cap. Before every call, swarm-review reserves a conservative worst-case cost and never starts a call that would exceed the cap. Successful calls settle to an observed-output upper bound; failed or ambiguous calls retain their reservation because they may still be billable.
+- `budget.fallback_model`: optional cheaper model from the same provider to use when the primary model no longer fits. Models without known pricing require a known fallback when budgeting is enabled.
+- `budget.max_output_tokens`: maximum output tokens reserved and requested per call. Defaults to `4096`.
 - `debate.rounds`: how many debate rounds to run after the first-pass review.
 - `debate.min_confidence`: findings below this threshold are filtered out.
 - `principal.mandate`: instructions for the synthesis agent.

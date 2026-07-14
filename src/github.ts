@@ -1,5 +1,6 @@
 import type { Octokit } from "@octokit/rest";
 import { stripRereviewCommands } from "./events.js";
+import type { Finding } from "./types.js";
 
 const MANAGED_COMMENT_MARKER = "<!-- swarm-review:managed-comment -->";
 const MAX_FEEDBACK_COMMENTS = 20;
@@ -19,6 +20,26 @@ export function parsePositiveInteger(value: string): number | undefined {
 
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+export function resolveReviewEvent(
+  requested: "COMMENT" | "APPROVE" | "REQUEST_CHANGES" | "AUTO",
+  acceptedFindings: Array<{ finding: Finding }>,
+  budgetExhausted: boolean
+): "COMMENT" | "APPROVE" | "REQUEST_CHANGES" {
+  if (budgetExhausted) {
+    return "COMMENT";
+  }
+  if (requested === "APPROVE" || requested === "REQUEST_CHANGES") {
+    return requested;
+  }
+  if (requested !== "AUTO") {
+    return "COMMENT";
+  }
+  if (acceptedFindings.some((item) => item.finding.severity === "blocking")) {
+    return "REQUEST_CHANGES";
+  }
+  return acceptedFindings.length === 0 ? "APPROVE" : "COMMENT";
 }
 
 function withManagedCommentMarker(body: string): string {

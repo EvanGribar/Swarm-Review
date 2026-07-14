@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { callLLMStructured, normalizeFinding } from "../llm.js";
+import { BudgetExceededError } from "../budget.js";
 import { RawFindingSchema, type Finding, type RawFinding, type ProviderConfig, type AgentConfig } from "../types.js";
 
 const RawFindingArraySchema = z.array(RawFindingSchema);
@@ -31,12 +32,21 @@ export function resolveAgentProviderConfig(
 }
 
 export async function runAgentFindingRound(options: AgentRoundOptions): Promise<Finding[]> {
-  const rawFindings = await callLLMStructured<RawFinding[]>(
-    options.providerConfig,
-    options.system,
-    options.prompt,
-    RawFindingArraySchema
-  );
+  let rawFindings: RawFinding[];
+  try {
+    rawFindings = await callLLMStructured<RawFinding[]>(
+      options.providerConfig,
+      options.system,
+      options.prompt,
+      RawFindingArraySchema
+    );
+  } catch (error) {
+    if (error instanceof BudgetExceededError) {
+      console.log(`::warning::${error.message}`);
+      return [];
+    }
+    throw error;
+  }
 
   return rawFindings
     .map((finding, index) => normalizeFinding(finding, options.agentName, `${options.idPrefix}-${index + 1}`))

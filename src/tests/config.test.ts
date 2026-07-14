@@ -27,6 +27,10 @@ test("loadSwarmConfig reads a local config file", async () => {
       "debate:",
       "  rounds: 1",
       "  min_confidence: 0.7",
+      "budget:",
+      "  max_cost_usd: 1.5",
+      "  fallback_model: gpt-4o-mini",
+      "  max_output_tokens: 2048",
       "principal:",
       "  mandate: Make the final call.",
       "output:",
@@ -42,6 +46,9 @@ test("loadSwarmConfig reads a local config file", async () => {
   assert.equal(config.agents[0]?.min_confidence, 0.85);
   assert.equal(config.debate.rounds, 1);
   assert.equal(config.debate.min_confidence, 0.7);
+  assert.equal(config.budget?.max_cost_usd, 1.5);
+  assert.equal(config.budget?.fallback_model, "gpt-4o-mini");
+  assert.equal(config.budget?.max_output_tokens, 2048);
   assert.equal(config.principal.mandate, "Make the final call.");
   assert.equal(config.output.mode, "full");
 });
