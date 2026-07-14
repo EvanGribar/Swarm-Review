@@ -141,3 +141,28 @@ test("callLLMStructured does not repeat paid calls for provider errors", async (
   );
   assert.equal(attempts, 1);
 });
+
+test("callAnthropic sends requests to the configured endpoint", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let requestedUrl = "";
+  globalThis.fetch = (async (input) => {
+    requestedUrl = String(input);
+    return new Response(JSON.stringify({ content: [{ type: "text", text: "[]" }] }), {
+      status: 200,
+    });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await callAnthropic(
+    "test-key",
+    "test-model",
+    "system",
+    "prompt",
+    100,
+    "https://gateway.example.com/v1/messages"
+  );
+
+  assert.equal(requestedUrl, "https://gateway.example.com/v1/messages");
+});

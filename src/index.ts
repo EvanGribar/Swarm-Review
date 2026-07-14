@@ -174,7 +174,7 @@ async function main(): Promise<void> {
   const { owner, repo } = resolveRepository();
   const pullNumber = await resolvePullRequestNumber();
 
-  const providerConfig = resolveProviderConfig(swarmConfig, anthropicApiKey, anthropicModel);
+  const providerConfig = resolveProviderConfig(swarmConfig, anthropicApiKey, anthropicModel, apiEndpoint);
 
   console.log(`Running swarm-review for ${owner}/${repo}#${pullNumber}`);
   console.log(`Using provider: ${providerConfig.type}`);

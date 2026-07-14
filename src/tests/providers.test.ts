@@ -19,6 +19,18 @@ test("resolveProviderConfig falls back to legacy Anthropic config if provider is
   assert.equal(config.config.model, "claude-3-5-sonnet-latest");
 });
 
+test("resolveProviderConfig preserves the legacy Anthropic endpoint", () => {
+  const config = resolveProviderConfig(
+    mockSwarmConfig(),
+    "anthropic-key-123",
+    "claude-3-5-sonnet-latest",
+    "https://gateway.example.com/v1/messages"
+  );
+
+  assert.equal(config.type, "anthropic");
+  assert.equal(config.config.baseURL, "https://gateway.example.com/v1/messages");
+});
+
 test("resolveProviderConfig throws if legacy Anthropic key is missing and no provider config exists", () => {
   const swarmConfig = mockSwarmConfig();
 
