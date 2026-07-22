@@ -54,6 +54,16 @@ outputs:
     description: Estimated total cost of LLM calls in USD.
   total-calls:
     description: Total number of LLM calls executed.
+  coverage-path:
+    description: Path to the generated SpecBridge coverage report when requirement-aware review is enabled.
+  sarif-path:
+    description: Path to the generated SpecBridge SARIF report when requirement-aware review is enabled.
+  requirement-count:
+    description: Number of requirement criteria evaluated.
+  violated-count:
+    description: Number of evidenced violated criteria.
+  not-verifiable-count:
+    description: Number of criteria that could not be verified.
 runs:
   using: node20
   main: dist/index.js

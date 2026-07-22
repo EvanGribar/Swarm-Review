@@ -2,6 +2,8 @@
 
 swarm-review is a GitHub Action that turns one pull request into a multi-agent review session.
 
+Requirement-aware review is available as an opt-in v1.1 milestone. See [SpecBridge integration](docs/SPECBRIDGE.md) for configuration, artifacts, SARIF consumption, and merge-gate behavior.
+
 Each configured agent reads the diff independently, flags issues, and then enters a structured debate with the rest of the swarm. A principal agent reads the full transcript and posts the final PR comment, so the output looks like a real engineering review instead of a single flat model response.
 
 ## Why it exists
@@ -516,7 +518,7 @@ Releases are delivered in focused pull requests so each risk domain can be revie
 2. The release workflow checks that the tag matches `package.json`, runs the full tests, and verifies the committed bundle.
 3. For stable releases, the workflow advances the floating major tag (for example, `v1`) to the verified release commit.
 
-Consumers should pin `EvanGribar/Swarm-Review@v1` for compatible v1 updates or a full tag such as `@v1.0.0` for an immutable version.
+Consumers should pin `EvanGribar/Swarm-Review@v1` for compatible v1 updates or a full tag such as `@v1.1.0` for an immutable version.
 
 
 ## Project Layout

@@ -1,0 +1,14 @@
+{
+  "name": "@specbridge/sarif",
+  "version": "0.1.0-swarm-review-bridge",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    }
+  },
+  "dependencies": {
+    "@specbridge/core": "file:../specbridge/packages/core"
+  }
+}
