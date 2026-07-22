@@ -252,7 +252,7 @@ async function main(): Promise<void> {
     requirementCoverage = normalizeCoverage(requirementInput.contract, decisions, {
       reviewer: { name: "swarm-review", version: "1.1.0" },
       target: { repository: `${owner}/${repo}`, commitSha: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF },
-      execution: { startedAt: runStartedAt.toISOString(), completedAt: new Date().toISOString(), runId: process.env.GITHUB_RUN_ID, metadata: { modelCallCount: tokenTracker.totalCalls } },
+      execution: { startedAt: runStartedAt.toISOString(), completedAt: new Date().toISOString(), runId: process.env.GITHUB_RUN_ID, metadata: { modelCallCount: tokenTracker.totalCalls, tokenUsage: tokenTracker.models, estimatedCostUsd: calculateEstimatedCost().cost, durationMs: Date.now() - runStartedAt.getTime() } },
       metadata: { requirementContractSource: swarmConfig.requirements.contract_path, pullNumber, baseSha: process.env.GITHUB_BASE_SHA, headSha: process.env.GITHUB_SHA },
     });
     requirementArtifacts = await writeRequirementArtifacts(workspaceRoot, requirementCoverage);
