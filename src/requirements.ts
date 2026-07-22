@@ -100,3 +100,10 @@ export function coverageStats(coverage: ReviewCoverageReport): { requirementCoun
   const criteria = coverage.requirements.flatMap((requirement) => requirement.criteria);
   return { requirementCount: criteria.length, violatedCount: criteria.filter((item) => item.status === "violated").length, notVerifiableCount: criteria.filter((item) => item.status === "not_verifiable").length };
 }
+
+/** Applies the requirement gate to already-normalized canonical coverage only. */
+export function hasBlockingRequirementViolation(coverage: ReviewCoverageReport): boolean {
+  return coverage.requirements.some((requirement) =>
+    requirement.severity === "blocking" && requirement.criteria.some((criterion) => criterion.status === "violated" && criterion.evidence.length > 0)
+  );
+}

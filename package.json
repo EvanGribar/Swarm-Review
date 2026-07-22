@@ -34,6 +34,7 @@
     "build:specbridge": "tsc -p vendor/specbridge/packages/core && tsc -p vendor/specbridge/packages/sarif",
     "prebuild": "npm run build:specbridge"
     ,"postbuild": "node -e \"const fs=require('node:fs'); fs.rmSync('dist/package.json', { force: true }); fs.mkdirSync('dist/tests', { recursive: true }); fs.writeFileSync('dist/tests/package.json', '{\\\"type\\\":\\\"module\\\"}\\n')\""
+    ,"validation:specbridge": "npm run build && node -e \"process.env.SWARM_OFFLINE_VALIDATION='1'; import('./dist/tests/specbridge-offline-validation.js')\""
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",

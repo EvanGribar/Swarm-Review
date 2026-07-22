@@ -16,7 +16,7 @@ import { tokenTracker, resetTokenTracker, calculateEstimatedCost } from "./provi
 import { buildCodebaseIndex } from "./context.js";
 import { isTrustedRereviewActor, parseRereviewCommand } from "./events.js";
 import { configureBudget, getBudgetStatus } from "./budget.js";
-import { loadRequirementContract, normalizeCoverage, writeRequirementArtifacts, coverageStats } from "./requirements.js";
+import { hasBlockingRequirementViolation, loadRequirementContract, normalizeCoverage, writeRequirementArtifacts, coverageStats } from "./requirements.js";
 import { evaluateRequirements } from "./agents/requirements.js";
 
 type IssueCommentEventPayload = {
@@ -298,10 +298,8 @@ async function main(): Promise<void> {
     acceptedFindings,
     getBudgetStatus().exhausted
   );
-  const hasBlockingRequirementViolation = requirementCoverage?.requirements.some((requirement) =>
-    requirement.severity === "blocking" && requirement.criteria.some((criterion) => criterion.status === "violated")
-  );
-  if (swarmConfig.requirements.fail_on_violation && hasBlockingRequirementViolation && !getBudgetStatus().exhausted) {
+  const blockingRequirementViolation = requirementCoverage ? hasBlockingRequirementViolation(requirementCoverage) : false;
+  if (swarmConfig.requirements.fail_on_violation && blockingRequirementViolation && !getBudgetStatus().exhausted) {
     actualEvent = "REQUEST_CHANGES";
   }
 
