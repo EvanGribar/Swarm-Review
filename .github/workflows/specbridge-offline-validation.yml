@@ -2,6 +2,8 @@ name: specbridge-offline-validation
 
 on:
   workflow_dispatch:
+  push:
+    branches: [codex/specbridge-v1-1]
   pull_request:
     branches: [main]
     paths:
