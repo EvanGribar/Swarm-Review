@@ -20,4 +20,4 @@ Every criterion becomes exactly one `satisfied`, `violated`, `not_verifiable`, o
     sarif_file: swarm-review-output/findings.sarif
 ```
 
-The action exposes `coverage-path`, `sarif-path`, `requirement-count`, `violated-count`, and `not-verifiable-count`. `fail_on_violation: true` requests changes only for evidenced blocking violations. SpecBridge is pinned as a Git submodule until its packages are published; the action bundle contains the real core validator and SARIF converter. Future SpecBench work can ingest coverage by criterion ID; SpecBench is not changed here.
+The action exposes `coverage-path`, `sarif-path`, `requirement-count`, `violated-count`, and `not-verifiable-count`. `fail_on_violation: true` requests changes only for evidenced blocking violations. SpecBridge is pinned as a Git submodule until its packages are published; a local package bridge avoids an unpublished `workspace:*` manifest reference while re-exporting the real SARIF converter. The action bundle contains the real core validator and converter. Future SpecBench work can ingest coverage by criterion ID; SpecBench is not changed here.

@@ -38,7 +38,7 @@
   "dependencies": {
     "@octokit/rest": "^21.0.2",
     "@specbridge/core": "file:vendor/specbridge/packages/core",
-    "@specbridge/sarif": "file:vendor/specbridge/packages/sarif",
+    "@specbridge/sarif": "file:vendor/specbridge-sarif",
     "js-yaml": "^4.2.0",
     "zod": "^3.24.1"
   },

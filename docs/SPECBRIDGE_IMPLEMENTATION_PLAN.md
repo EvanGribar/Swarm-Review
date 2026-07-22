@@ -6,7 +6,7 @@ Swarm-Review runs independent finding agents, optional static analysis, sequenti
 
 ## Dependency strategy
 
-SpecBridge 0.1.0 is not published to npm. Pin its source at commit `7555472ea92d5876fa212376d43d40997ae1da81` as a Git submodule and consume the real `@specbridge/core` and `@specbridge/sarif` packages through local file dependencies. The action remains distributable because `ncc` bundles those dependencies. CI checks out submodules before `npm ci`. Once packages are published, replace the two file dependencies with exact released versions and remove the submodule without changing the integration API.
+SpecBridge 0.1.0 is not published to npm. Pin its source at commit `7555472ea92d5876fa212376d43d40997ae1da81` as a Git submodule. Consume `@specbridge/core` directly and expose the real compiled `@specbridge/sarif` implementation through a tiny local bridge, avoiding its unpublished `workspace:*` manifest reference. The action remains distributable because `ncc` bundles those dependencies. CI checks out submodules before `npm ci`. Once packages are published, replace the local dependencies with exact released versions and remove the submodule/bridge without changing the integration API.
 
 ## Modules and schema mappings
 
