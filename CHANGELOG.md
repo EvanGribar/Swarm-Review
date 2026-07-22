@@ -4,7 +4,21 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
-- Add opt-in SpecBridge requirement-aware review with validated coverage and SARIF artifacts.
+## v1.1.0 - 2026-07-21
+
+### Added
+- Opt-in SpecBridge requirement contracts with safe, repository-local loading and validation.
+- Criterion-level `satisfied`, `violated`, `not_verifiable`, and `not_applicable` coverage decisions with evidence enforcement.
+- Canonical `swarm-review-output/coverage.json`, SARIF generation for evidenced violations, and artifact-derived PR coverage rendering.
+- Optional `requirements.fail_on_violation` gating and action outputs for coverage and SARIF paths and counts.
+- Deterministic offline validation covering the structured-output boundary, artifacts, SARIF, rendering, and gate policy without provider credentials.
+
+### Changed
+- Requirement-aware review remains disabled by default; existing review behavior is backward compatible.
+
+### Limitations
+- SpecBridge remains pinned through a Git submodule and a temporary local SARIF package bridge until published packages are available.
+- SARIF is generated but not uploaded directly. Real-provider smoke validation is tracked in #66; offline validation does not prove model quality.
 
 ## v1.0.0 - 2026-07-14
 

@@ -35,7 +35,7 @@ test("release and action metadata are valid and aligned with v1", async () => {
   assert.ok(action.inputs?.["pull-number"]);
   assert.deepEqual(release.on?.release?.types, ["published"]);
   assert.ok(release.jobs?.["validate-and-update-major-tag"]);
-  assert.equal(packageJson.version, "1.0.0");
+  assert.equal(packageJson.version, "1.1.0");
   assert.equal(packageLock.version, packageJson.version);
   assert.equal(packageLock.packages?.[""]?.version, packageJson.version);
 });

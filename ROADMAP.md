@@ -2,16 +2,11 @@
 
 This roadmap contains only work planned after the v1.0.0 production release.
 
-## v1.1 requirement-aware review
-
-Integrate the checked-in SpecBridge contract path, validated coverage artifact, and SARIF output while deferring future requirement sources and SpecBench ingestion.
-
 ```mermaid
 gantt
     title Swarm-Review Future Releases
     dateFormat YYYY-MM-DD
     section Future Milestones
-    v1.1.0 (Scale and Observability) :active, 2026-08-10, 20d
     v1.2.0 (Local Tools and Dashboard) : 2026-08-30, 20d
     v1.3.0 (IDE and Policy Integrations) : 2026-09-20, 20d
 ```
@@ -19,13 +14,6 @@ gantt
 ## Vision
 
 Swarm-review should remain zero-hosting by default, read like a real engineering review, and make model cost and behavior observable and controllable.
-
-## v1.1.0: Scale and Observability
-
-- Cache review inputs and results for unchanged files without weakening commit-specific correctness.
-- Export optional OpenTelemetry traces for provider latency, retries, token usage, and debate stages.
-- Add model pricing configuration so private and newly released models can participate in strict budgets.
-- Expand integration coverage for large diffs, provider gateways, and rate-limit behavior.
 
 ## v1.2.0: Local Tools and Dashboard
 

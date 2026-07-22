@@ -518,7 +518,7 @@ Releases are delivered in focused pull requests so each risk domain can be revie
 2. The release workflow checks that the tag matches `package.json`, runs the full tests, and verifies the committed bundle.
 3. For stable releases, the workflow advances the floating major tag (for example, `v1`) to the verified release commit.
 
-Consumers should pin `EvanGribar/Swarm-Review@v1` for compatible v1 updates or a full tag such as `@v1.0.0` for an immutable version.
+Consumers should pin `EvanGribar/Swarm-Review@v1` for compatible v1 updates or a full tag such as `@v1.1.0` for an immutable version.
 
 
 ## Project Layout
