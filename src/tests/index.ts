@@ -13,4 +13,5 @@ import "./metadata.test.js";
 import "./prompts.test.js";
 import "./providers.test.js";
 import "./static_analysis.test.js";
+import "./requirements.test.js";
 import "./context.test.js";

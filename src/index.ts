@@ -9,12 +9,15 @@ import { synthesizePrincipalSummary } from "./agents/principal.js";
 import { upsertPullRequestComment, updateCheckRun, parsePositiveInteger, createPullRequestReview, getDeveloperFeedback, resolveReviewEvent } from "./github.js";
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_API_ENDPOINT } from "./llm.js";
 import { renderDebateTranscriptMarkdown, formatInlineCommentBody } from "./format.js";
+import { renderRequirementCoverageMarkdown } from "./format.js";
 import { runStaticAnalysis } from "./static_analysis.js";
 import { DEFAULT_PROVIDER_CONFIG, type ProviderConfig, type SwarmConfig, type Finding } from "./types.js";
 import { tokenTracker, resetTokenTracker, calculateEstimatedCost } from "./providers.js";
 import { buildCodebaseIndex } from "./context.js";
 import { isTrustedRereviewActor, parseRereviewCommand } from "./events.js";
 import { configureBudget, getBudgetStatus } from "./budget.js";
+import { loadRequirementContract, normalizeCoverage, writeRequirementArtifacts, coverageStats } from "./requirements.js";
+import { evaluateRequirements } from "./agents/requirements.js";
 
 type IssueCommentEventPayload = {
   issue?: { pull_request?: unknown };
@@ -116,6 +119,7 @@ function buildStatsBlock(): string {
   ].join("\n");
 }
 async function main(): Promise<void> {
+  const runStartedAt = new Date();
   const eventPath = process.env.GITHUB_EVENT_PATH;
   const eventName = process.env.GITHUB_EVENT_NAME;
   let eventPayload: IssueCommentEventPayload | null = null;
@@ -170,6 +174,9 @@ async function main(): Promise<void> {
 
   const workspaceRoot = process.cwd();
   const swarmConfig = await loadSwarmConfig(workspaceRoot, configPath);
+  const requirementInput = swarmConfig.requirements.enabled
+    ? await loadRequirementContract(workspaceRoot, swarmConfig.requirements)
+    : undefined;
   const octokit = createOctokit(githubToken);
   const { owner, repo } = resolveRepository();
   const pullNumber = await resolvePullRequestNumber();
@@ -232,6 +239,25 @@ async function main(): Promise<void> {
     providerConfig,
   });
 
+  let requirementCoverage: Awaited<ReturnType<typeof normalizeCoverage>> | undefined;
+  let requirementArtifacts: Awaited<ReturnType<typeof writeRequirementArtifacts>> | undefined;
+  if (requirementInput) {
+    const decisions = await evaluateRequirements({
+      contract: requirementInput.contract,
+      diff,
+      providerConfig,
+      diffConfig: swarmConfig.diff,
+      transcript,
+    });
+    requirementCoverage = normalizeCoverage(requirementInput.contract, decisions, {
+      reviewer: { name: "swarm-review", version: "1.1.0" },
+      target: { repository: `${owner}/${repo}`, commitSha: process.env.GITHUB_SHA, ref: process.env.GITHUB_REF },
+      execution: { startedAt: runStartedAt.toISOString(), completedAt: new Date().toISOString(), runId: process.env.GITHUB_RUN_ID, metadata: { modelCallCount: tokenTracker.totalCalls } },
+      metadata: { requirementContractSource: swarmConfig.requirements.contract_path, pullNumber, baseSha: process.env.GITHUB_BASE_SHA, headSha: process.env.GITHUB_SHA },
+    });
+    requirementArtifacts = await writeRequirementArtifacts(workspaceRoot, requirementCoverage);
+  }
+
   const statsBlock = buildStatsBlock();
 
   const headlineSummary = summary.summary.startsWith("## swarm-review")
@@ -243,7 +269,8 @@ async function main(): Promise<void> {
       ? `${headlineSummary}${renderDebateTranscriptMarkdown(transcript)}`
       : headlineSummary;
 
-  const commentBody = `${baseCommentBody}\n\n${statsBlock}`;
+  const requirementSection = requirementCoverage ? `\n\n${renderRequirementCoverageMarkdown(requirementCoverage)}` : "";
+  const commentBody = `${baseCommentBody}${requirementSection}\n\n${statsBlock}`;
 
   const commentResult = await upsertPullRequestComment(octokit, owner, repo, pullNumber, commentBody);
   const checkRunUpdated = await updateCheckRun(octokit, owner, repo, checkRunId, commentBody);
@@ -266,11 +293,17 @@ async function main(): Promise<void> {
     }
   }
 
-  const actualEvent = resolveReviewEvent(
+  let actualEvent = resolveReviewEvent(
     reviewEvent,
     acceptedFindings,
     getBudgetStatus().exhausted
   );
+  const hasBlockingRequirementViolation = requirementCoverage?.requirements.some((requirement) =>
+    requirement.severity === "blocking" && requirement.criteria.some((criterion) => criterion.status === "violated")
+  );
+  if (swarmConfig.requirements.fail_on_violation && hasBlockingRequirementViolation && !getBudgetStatus().exhausted) {
+    actualEvent = "REQUEST_CHANGES";
+  }
 
   if (isInline || reviewEvent !== "COMMENT") {
     const validLinesMap = new Map<string, Set<number>>();
@@ -329,6 +362,15 @@ async function main(): Promise<void> {
   await writeActionOutput("total-output-tokens", String(totalOutput));
   await writeActionOutput("total-cost", cost.toFixed(4));
   await writeActionOutput("total-calls", String(tokenTracker.totalCalls));
+
+  if (requirementCoverage && requirementArtifacts) {
+    const stats = coverageStats(requirementCoverage);
+    await writeActionOutput("coverage-path", requirementArtifacts.coveragePath);
+    await writeActionOutput("sarif-path", requirementArtifacts.sarifPath);
+    await writeActionOutput("requirement-count", String(stats.requirementCount));
+    await writeActionOutput("violated-count", String(stats.violatedCount));
+    await writeActionOutput("not-verifiable-count", String(stats.notVerifiableCount));
+  }
 
   if (commentResult.commentUrl) {
     await writeActionOutput("comment-url", commentResult.commentUrl);

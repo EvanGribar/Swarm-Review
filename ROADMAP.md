@@ -2,6 +2,10 @@
 
 This roadmap contains only work planned after the v1.0.0 production release.
 
+## v1.1 requirement-aware review
+
+Integrate the checked-in SpecBridge contract path, validated coverage artifact, and SARIF output while deferring future requirement sources and SpecBench ingestion.
+
 ```mermaid
 gantt
     title Swarm-Review Future Releases

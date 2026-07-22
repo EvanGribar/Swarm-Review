@@ -2,6 +2,8 @@
 
 swarm-review is a GitHub Action that turns one pull request into a multi-agent review session.
 
+Requirement-aware review is available as an opt-in v1.1 milestone. See [SpecBridge integration](docs/SPECBRIDGE.md) for configuration, artifacts, SARIF consumption, and merge-gate behavior.
+
 Each configured agent reads the diff independently, flags issues, and then enters a structured debate with the rest of the swarm. A principal agent reads the full transcript and posts the final PR comment, so the output looks like a real engineering review instead of a single flat model response.
 
 ## Why it exists

@@ -152,3 +152,9 @@ context_enrichment:
   enabled: true
   max_depth: 1
   file_size_limit_kb: 100
+
+requirements:
+  enabled: false
+  contract_path: .specbridge/requirements.json
+  fail_on_violation: false
+  upload_sarif: false

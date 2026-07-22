@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+- Add opt-in SpecBridge requirement-aware review with validated coverage and SARIF artifacts.
+
 ## v1.0.0 - 2026-07-14
 
 ### Added

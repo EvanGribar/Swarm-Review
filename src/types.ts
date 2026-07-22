@@ -228,6 +228,20 @@ export const BudgetConfigSchema = z.object({
   max_output_tokens: z.number().int().positive().max(32_768).default(4_096),
 });
 
+export const RequirementsConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  contract_path: z.string().min(1).default(".specbridge/requirements.json"),
+  fail_on_violation: z.boolean().default(false),
+  upload_sarif: z.boolean().default(false),
+  max_file_size_kb: z.number().int().positive().max(1024).default(256),
+}).default({
+  enabled: false,
+  contract_path: ".specbridge/requirements.json",
+  fail_on_violation: false,
+  upload_sarif: false,
+  max_file_size_kb: 256,
+});
+
 export const SwarmConfigSchema = z.object({
   agents: z.array(AgentConfigSchema).min(1).default(DEFAULT_AGENTS),
   debate: DebateConfigSchema.default(DEFAULT_DEBATE_CONFIG),
@@ -257,6 +271,7 @@ export const SwarmConfigSchema = z.object({
     max_depth: 1,
     file_size_limit_kb: 100,
   }),
+  requirements: RequirementsConfigSchema,
 });
 
 export type DebateConfig = z.infer<typeof DebateConfigSchema>;
@@ -266,6 +281,7 @@ export type StaticAnalysisCommand = z.infer<typeof StaticAnalysisCommandSchema>;
 export type StaticAnalysisConfig = z.infer<typeof StaticAnalysisConfigSchema>;
 export type ContextEnrichmentConfig = z.infer<typeof ContextEnrichmentConfigSchema>;
 export type BudgetConfig = z.infer<typeof BudgetConfigSchema>;
+export type RequirementsConfig = z.infer<typeof RequirementsConfigSchema>;
 
 
 export const FileDiffSchema = z.object({
