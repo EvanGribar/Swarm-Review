@@ -7,7 +7,7 @@
   },
   "description": "GitHub Action that runs a multi-agent pull request review swarm with structured debate and principal synthesis.",
   "license": "MIT",
-  "type": "commonjs",
+  "type": "module",
   "main": "dist/index.js",
   "repository": {
     "type": "git",
@@ -28,11 +28,17 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "bundle": "npm run typecheck && ncc build src/index.ts -o dist --minify",
+    "postbundle": "node -e \"require('node:fs').writeFileSync('dist/package.json', '{\\\"type\\\":\\\"commonjs\\\"}\\n')\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node --test dist/tests/index.js"
+    "test": "npm run build && node --test dist/tests/index.js",
+    "build:specbridge": "tsc -p vendor/specbridge/packages/core && tsc -p vendor/specbridge/packages/sarif",
+    "prebuild": "npm run build:specbridge"
+    ,"postbuild": "node -e \"const fs=require('node:fs'); fs.rmSync('dist/package.json', { force: true }); fs.mkdirSync('dist/tests', { recursive: true }); fs.writeFileSync('dist/tests/package.json', '{\\\"type\\\":\\\"module\\\"}\\n')\""
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
+    "@specbridge/core": "file:vendor/specbridge/packages/core",
+    "@specbridge/sarif": "file:vendor/specbridge/packages/sarif",
     "js-yaml": "^4.2.0",
     "zod": "^3.24.1"
   },
