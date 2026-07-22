@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { evaluateRequirements } from "../agents/requirements.js";
 import { renderRequirementCoverageMarkdown } from "../format.js";
-import { hasBlockingRequirementViolation, loadRequirementContract, normalizeCoverage, writeRequirementArtifacts } from "../requirements.js";
+import { hasBlockingRequirementViolation, loadRequirementContract, normalizeCoverage, shouldRequestChangesForRequirements, writeRequirementArtifacts } from "../requirements.js";
 import type { DebateTranscript } from "../types.js";
 
 const contract = { schemaVersion: "1.0", id: "offline-project-limits", title: "Offline project limits", source: { type: "json", path: ".specbridge/requirements.json" }, requirements: [{ id: "REQ-FREE-3", title: "Free project limit", description: "Free users are limited to three projects.", severity: "blocking", source: { type: "json", path: ".specbridge/requirements.json" }, criteria: [{ id: "api-rejects-fourth", description: "The API rejects a fourth project." }, { id: "ui-upgrade-prompt", description: "The UI displays an upgrade prompt." }, { id: "existing-projects-unchanged", description: "Existing projects remain unchanged." }] }] };
@@ -31,6 +31,9 @@ export async function runOfflineSpecBridgeValidation(root?: string): Promise<{ r
     const coverage = normalizeCoverage(loaded.contract, evaluated, { reviewer: { name: "swarm-review", version: "offline-validation" }, target: { repository: "offline/validation" } });
     assert.deepEqual(coverage.requirements[0]?.criteria.map((item) => item.status), ["satisfied", "violated", "not_verifiable"]);
     assert.equal(hasBlockingRequirementViolation(coverage), true);
+    assert.equal(shouldRequestChangesForRequirements({ fail_on_violation: false }, coverage, false), false);
+    assert.equal(shouldRequestChangesForRequirements({ fail_on_violation: true }, coverage, false), true);
+    assert.equal(shouldRequestChangesForRequirements({ fail_on_violation: true }, coverage, true), false);
     const artifacts = await writeRequirementArtifacts(root, coverage);
     const sarif = JSON.parse(await readFile(artifacts.sarifPath, "utf8"));
     assert.equal(sarif.runs[0].results.length, 1);
@@ -39,7 +42,9 @@ export async function runOfflineSpecBridgeValidation(root?: string): Promise<{ r
     const markdown = renderRequirementCoverageMarkdown(coverage);
     assert.match(markdown, /Requirement coverage/);
     assert.match(markdown, /not verifiable/);
-    assert.equal(hasBlockingRequirementViolation(normalizeCoverage(loaded.contract, decisions.map((item) => ({ ...item, status: "not_verifiable" as const, evidence: [] })), { reviewer: { name: "x" }, target: {} })), false);
+    const unverifiableOnly = normalizeCoverage(loaded.contract, decisions.map((item) => ({ ...item, status: "not_verifiable" as const, evidence: [] })), { reviewer: { name: "x" }, target: {} });
+    assert.equal(hasBlockingRequirementViolation(unverifiableOnly), false);
+    assert.equal(shouldRequestChangesForRequirements({ fail_on_violation: true }, unverifiableOnly, false), false);
     await writeFile(path.join(root, "coverage-table.md"), `${markdown}\n`);
     return { root, ...artifacts };
   } finally { globalThis.fetch = originalFetch; }

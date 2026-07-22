@@ -107,3 +107,11 @@ export function hasBlockingRequirementViolation(coverage: ReviewCoverageReport):
     requirement.severity === "blocking" && requirement.criteria.some((criterion) => criterion.status === "violated" && criterion.evidence.length > 0)
   );
 }
+
+export function shouldRequestChangesForRequirements(
+  config: Pick<RequirementsConfig, "fail_on_violation">,
+  coverage: ReviewCoverageReport | undefined,
+  budgetExhausted: boolean
+): boolean {
+  return Boolean(config.fail_on_violation && coverage && !budgetExhausted && hasBlockingRequirementViolation(coverage));
+}
