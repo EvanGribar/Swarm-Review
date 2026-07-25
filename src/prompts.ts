@@ -1,6 +1,6 @@
 import { formatFileDiffs } from "./diff.js";
 import type { AgentConfig, DebateTranscript, FileDiff, PrincipalConfig, DiffConfig } from "./types.js";
-import type { RequirementContract } from "@specbridge/core";
+import type { RequirementContract } from "./specbridge/core.js";
 
 function baseInstructions(): string {
   return [

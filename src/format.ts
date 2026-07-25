@@ -1,5 +1,5 @@
 import type { DebateTranscript, Finding, Severity } from "./types.js";
-import type { ReviewCoverageReport } from "@specbridge/core";
+import type { ReviewCoverageReport } from "./specbridge/core.js";
 
 function escapeMarkdown(value: string): string {
   return value.replace(/[\\`|<>]/g, "\\$&").replace(/\r?\n/g, " ");

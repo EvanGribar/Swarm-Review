@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { RequirementContract } from "@specbridge/core";
+import type { RequirementContract } from "../specbridge/core.js";
 
 import { BudgetExceededError } from "../budget.js";
 import { callLLMStructured } from "../llm.js";
