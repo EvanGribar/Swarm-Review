@@ -22,20 +22,20 @@ This is the mechanic that doesn't exist anywhere else. That is the north star.
 
 ## Core mechanic
 
-### Round 1 — independent review
+### Stage 1 — independent specialist review
 All agents receive the raw git diff in parallel. Each agent has no knowledge of what the others will say. Each returns structured findings: a claim, a severity, a file, a line, and a confidence score.
 
-Additionally, if **Static Analysis** is enabled, linter and compiler tools (like ESLint and TypeScript compilation) are executed in the runner workspace. Their parsed diagnostics join the round 1 review findings and serve as ground-truth facts during the debate phase.
+Additionally, if **Static Analysis** is enabled, linter and compiler tools (like ESLint and TypeScript compilation) are executed in the runner workspace. Their parsed diagnostics join the review findings and serve as ground-truth facts during principal synthesis.
 
-If **Context Enrichment** is enabled, import dependencies in changed files are recursively traced up to `max_depth` (using AST parsing via the TypeScript compiler). Skeletal signatures (excluding method/function bodies) of imported classes, functions, types, and variables are extracted and injected into the review and debate prompts as supporting codebase context, preventing context window explosion while providing necessary code details.
+If **Context Enrichment** is enabled, import dependencies in changed files are recursively traced up to `max_depth` (using AST parsing via the TypeScript compiler). Skeletal signatures (excluding method/function bodies) of imported classes, functions, types, and variables are extracted and injected into prompts as supporting codebase context, preventing context window explosion while providing necessary code details.
 
-### Round 2 — debate
-Each agent receives the full findings from all other agents. Each agent can produce new findings or rebuttals targeting another agent's finding by ID. Rebuttals can agree, dispute, or escalate. Agents can be rebutted back. The number of debate rounds is configurable.
+If **SpecBridge Requirement Evaluation** is enabled, checked-in `.specbridge/requirements.json` contracts are evaluated against the PR patch, generating structured `coverage.json` and `findings.sarif` artifacts.
 
-### Round 3 — synthesis
-A principal agent reads the complete debate transcript — all findings and all rebuttals — and produces the final PR comment. The comment surfaces agreements, unresolved disputes, and final calls with reasoning. The principal can override, defer, or escalate any finding.
+### Stage 2 — evidence-aware principal synthesis (default)
+A principal engineer agent receives all independent reviewer findings (along with optional static analysis and requirement evaluation results) and synthesizes the final PR review summary. The principal eliminates false positives, resolves overlaps, and makes final calls.
 
-This should be configureable. If a user wants to see the full process, they can toggle the agents to comment all. If the user wwant to only see the outcome, they should be able to toggle that.
+### Stage 3 — optional structured debate (opt-in)
+When debate is explicitly enabled (`debate.enabled: true` or `debate.rounds > 0`), agents engage in structured rebuttal rounds before principal synthesis, receiving full transcript history to challenge or reinforce claims.
 
 ---
 

@@ -52,29 +52,35 @@ export const DEFAULT_AGENTS: AgentConfig[] = [
     mandate:
       "Review for architectural concerns. Look for separation of concerns violations, tight coupling, naming inconsistency, and patterns that do not fit the codebase.",
   },
-  {
-    name: "dx",
-    mandate:
-      "Review for developer experience. Look for missing tests, outdated docs, unclear variable names, and changes that will be hard to maintain.",
-  },
 ];
 
 export const DEFAULT_DEBATE_CONFIG = {
-  rounds: 2,
+  rounds: 0,
   min_confidence: 0.6,
 };
 
 export const DEFAULT_PRINCIPAL_MANDATE =
   "You are the principal engineer. Read the full debate and make final calls. Be direct. Show your reasoning. Surface genuine disagreements clearly.";
 
-export const DebateConfigSchema = z.object({
-  rounds: z.number().int().min(0).default(DEFAULT_DEBATE_CONFIG.rounds),
-  min_confidence: z
-    .number()
-    .min(0)
-    .max(1)
-    .default(DEFAULT_DEBATE_CONFIG.min_confidence),
-});
+export const DebateConfigSchema = z
+  .object({
+    enabled: z.boolean().optional(),
+    rounds: z.number().int().min(0).default(DEFAULT_DEBATE_CONFIG.rounds),
+    min_confidence: z
+      .number()
+      .min(0)
+      .max(1)
+      .default(DEFAULT_DEBATE_CONFIG.min_confidence),
+  })
+  .transform((val) => {
+    let rounds = val.rounds;
+    if (val.enabled === true && val.rounds === 0) {
+      rounds = 1;
+    } else if (val.enabled === false) {
+      rounds = 0;
+    }
+    return { ...val, rounds };
+  });
 
 export const PrincipalConfigSchema = z.object({
   mandate: z.string().min(1).default(DEFAULT_PRINCIPAL_MANDATE),
@@ -242,7 +248,11 @@ export const RequirementsConfigSchema = z.object({
   max_file_size_kb: 256,
 });
 
+export const PresetSchema = z.enum(["fast", "balanced", "thorough", "requirements"]);
+export type Preset = z.infer<typeof PresetSchema>;
+
 export const SwarmConfigSchema = z.object({
+  preset: PresetSchema.optional(),
   agents: z.array(AgentConfigSchema).min(1).default(DEFAULT_AGENTS),
   debate: DebateConfigSchema.default(DEFAULT_DEBATE_CONFIG),
   principal: PrincipalConfigSchema.default({ mandate: DEFAULT_PRINCIPAL_MANDATE }),

@@ -1,28 +1,28 @@
 # swarm-review
 
-swarm-review is a GitHub Action that turns one pull request into a multi-agent review session.
+swarm-review is a GitHub Action for **independent specialist review, evidence-aware synthesis, and optional requirement validation**.
 
-Requirement-aware review is available as an opt-in v1.1 milestone. See [SpecBridge integration](docs/SPECBRIDGE.md) for configuration, artifacts, SARIF consumption, and merge-gate behavior.
+Requirement-aware review is supported via [SpecBridge integration](docs/SPECBRIDGE.md) for contract configuration, coverage artifacts, SARIF consumption, and merge-gate behavior.
 
-Each configured agent reads the diff independently, flags issues, and then enters a structured debate with the rest of the swarm. A principal agent reads the full transcript and posts the final PR comment, so the output looks like a real engineering review instead of a single flat model response.
+Each configured agent reads the diff independently and flags domain-specific issues. A principal agent synthesizes all findings into a clear, actionable engineering review. Structured debate rounds remain available as an opt-in feature for complex or high-risk pull requests.
 
 ## Why it exists
 
-Most AI review tools give you one opinion. swarm-review gives you a review process.
+Most AI review tools give you a single uncoordinated opinion. swarm-review gives you an evidence-backed review process.
 
-- Different agents can specialize in security, performance, architecture, or whatever your team needs.
-- Agents can challenge each other before the final comment is posted.
-- Teams can choose whether to show only the final outcome or the full debate transcript.
+- **Specialized Independent Review**: Different agents specialize in security, performance, architecture, or custom domains.
+- **Evidence-Aware Principal Synthesis**: A principal engineering agent synthesizes findings, eliminates false positives, and makes final calls.
+- **Optional Requirement Validation**: Validate pull requests directly against `.specbridge/requirements.json` contracts.
+- **Evaluation-Backed Efficiency**: Default non-debate mode eliminates unnecessary LLM calls, saving cost and latency.
 
 ## How it works
 
 1. The action fetches the pull request diff from GitHub.
 2. If `static_analysis` is enabled, the action runs linter and compiler checks in the runner workspace and parses warnings and errors.
 3. Every agent performs an independent first-pass review in parallel.
-4. The static analysis findings are merged with the agent findings.
-5. The agents debate each other for the configured number of rounds, treating the static analysis findings as ground-truth facts.
-6. The principal agent synthesizes the transcript into a final summary.
-7. The action updates the PR comment and, optionally, the check run.
+4. The principal agent synthesizes all findings (and optional static analysis / SpecBridge contracts) into a final review summary.
+5. If debate is explicitly enabled (`debate.enabled: true` or `debate.rounds > 0`), agents engage in structured rebuttal rounds before principal synthesis.
+6. The action updates the PR comment and, optionally, the check run.
 
 ## Evaluation & Architecture Benchmarks
 
@@ -107,40 +107,30 @@ This allows agents to incorporate developer feedback and debate, defend, or conc
 
 For `issue_comment` events, keep the checkout on the trusted default branch. Checking out and executing code from an untrusted pull request in a workflow that can access secrets is unsafe. The pull request diff still comes from GitHub's API; local static-analysis and context-enrichment inputs come from the trusted checkout.
 
-## Configuration
+## Presets & Configuration
 
-If `.swarm.yml` is missing, the action uses the default config bundled with this repository.
+If `.swarm.yml` is missing, the action defaults to `preset: balanced` (3 independent reviewers + principal synthesis, 0 debate rounds).
+
+### Presets
+
+Swarm-Review supports simple evaluation-backed presets:
+
+| Preset | Description | Reviewers | Debate | Static Analysis | Requirement Evaluation |
+| --- | --- | --- | --- | --- | --- |
+| `fast` | Lowest cost & latency for quick PRs | 1 (`security`) | 0 rounds | Off | Off |
+| `balanced` *(default)* | Evidence-backed default architecture | 3 (`security`, `performance`, `architecture`) | 0 rounds | Off | Off |
+| `thorough` | Full suite with linter/compiler checks | 4 (+ `dx`) | 0 rounds | On | Off |
+| `requirements` | Contract-aware SpecBridge evaluation | 3 | 0 rounds | Off | On (`.specbridge/requirements.json`) |
+
+### Example `.swarm.yml`
 
 ```yaml
-agents:
-  - name: security
-    mandate: >
-      Review for security vulnerabilities. Look for injection risks, exposed secrets,
-      broken auth, insecure defaults, and unsafe data handling.
-    system_prompt: >
-      You are a skeptical application-security reviewer. Prefer concrete exploit paths
-      over speculative concerns.
-    min_confidence: 0.8
-    include_patterns: ["src/**"]
-    exclude_patterns: ["*.spec.ts"]
+preset: balanced
 
-  - name: performance
-    mandate: >
-      Review for performance issues. Look for N+1 queries, unnecessary re-renders,
-      expensive operations in hot paths, and missing pagination.
-
-  - name: architecture
-    mandate: >
-      Review for architectural concerns. Look for separation of concerns violations,
-      tight coupling, naming inconsistency, and patterns that do not fit the codebase.
-
-  - name: dx
-    mandate: >
-      Review for developer experience. Look for missing tests, outdated docs,
-      unclear variable names, and changes that will be hard to maintain.
-
+# Opt-in structured debate (optional)
 debate:
-  rounds: 2
+  enabled: false # Set to true or rounds: 1 to enable debate
+  rounds: 0
   min_confidence: 0.6
 
 budget:
