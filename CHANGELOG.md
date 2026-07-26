@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [1.3.0](https://github.com/EvanGribar/Swarm-Review/compare/swarm-review-v1.2.0...swarm-review-v1.3.0) (2026-07-26)
+
+
+### Features
+
+* **architecture:** default non-debate review architecture, presets, and SpecBridge evaluation ([8622fce](https://github.com/EvanGribar/Swarm-Review/commit/8622fce7d83094f2f95a8fdbbbd41c5a1be3cb55))
+
 ## [1.2.0](https://github.com/EvanGribar/Swarm-Review/compare/swarm-review-v1.1.0...swarm-review-v1.2.0) (2026-07-25)
 
 
