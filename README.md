@@ -24,6 +24,19 @@ Most AI review tools give you one opinion. swarm-review gives you a review proce
 6. The principal agent synthesizes the transcript into a final summary.
 7. The action updates the PR comment and, optionally, the check run.
 
+## Evaluation & Architecture Benchmarks
+
+Swarm-Review's multi-agent debate architecture has been empirically benchmarked against [SpecBench v0.2](https://github.com/EvanGribar/SpecBench) across 5 distinct review configurations (Single-Agent, Swarm without Debate, Swarm with Debate, Swarm Debate + Static Analysis, and Requirement-Aware SpecBridge).
+
+Key measured findings:
+- **Principal Synthesis Sufficiency**: Independent reviewers plus principal synthesis (`swarm-no-debate`) achieves **100.0% Recall** and **100.0% Precision** on SpecBench v0.2 requirement violation cases. Principal synthesis alone filters false positives without requiring multi-agent debate rounds.
+- **Debate Cost & Latency Penalty**: Structured debate (`swarm-with-debate`) achieves identical 100% precision and recall as non-debate swarm, while adding **+26.2% cost** ($0.0077 vs $0.0061) and **+38.1% runtime latency** (116.4s vs 84.3s).
+- **SpecBridge Requirement Efficiency**: Contract-aware SpecBridge evaluation delivers **98.4% F1** at **22% of the cost** ($0.0017 vs $0.0077) and **27% of the latency** (31.9s vs 116.4s).
+
+For detailed methodology, per-case breakdowns, budget controls, and artifact indices, see:
+- [Evaluation Methodology](docs/EVALUATION.md)
+- [Evaluation Results & Benchmarks Report](docs/EVALUATION_RESULTS.md)
+
 ## Architecture
 
 swarm-review uses a strict three-stage pipeline:
