@@ -8,8 +8,8 @@ import {
   type CriterionCoverage,
   type RequirementContract,
   type ReviewCoverageReport,
-} from "./specbridge/core.js";
-import { toSarif } from "./specbridge/sarif.js";
+} from "@specbridge/core";
+import { toSarif } from "@specbridge/sarif";
 
 import type { RequirementsConfig } from "./types.js";
 
