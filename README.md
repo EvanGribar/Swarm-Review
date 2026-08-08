@@ -1,19 +1,28 @@
-# swarm-review
+# Swarm Review
 
-swarm-review is a GitHub Action for **independent specialist review, evidence-aware synthesis, and optional requirement validation**.
+## AI code review without trusting one model's opinion
 
-Requirement-aware review is supported via [SpecBridge integration](docs/SPECBRIDGE.md) for contract configuration, coverage artifacts, SARIF consumption, and merge-gate behavior.
+Swarm Review is a GitHub Action that runs independent specialist reviewers against each pull request, then asks a principal reviewer to resolve disagreements and publish one actionable result.
 
-Each configured agent reads the diff independently and flags domain-specific issues. A principal agent synthesizes all findings into a clear, actionable engineering review. Structured debate rounds remain available as an opt-in feature for complex or high-risk pull requests.
+```yaml
+- uses: EvanGribar/Swarm-Review@v1
+```
 
-## Why it exists
+## Why Swarm Review
 
-Most AI review tools give you a single uncoordinated opinion. swarm-review gives you an evidence-backed review process.
+- **Multiple independent reviews** across security, performance, architecture, or your own domains.
+- **One synthesized answer** instead of a pile of unrelated model opinions.
+- **Bring your own model** with provider support and hard per-run spending limits.
+- **Optional requirement validation** against a checked-in `.specbridge/requirements.json` contract.
 
-- **Specialized Independent Review**: Different agents specialize in security, performance, architecture, or custom domains.
-- **Evidence-Aware Principal Synthesis**: A principal engineering agent synthesizes findings, eliminates false positives, and makes final calls.
-- **Optional Requirement Validation**: Validate pull requests directly against `.specbridge/requirements.json` contracts.
-- **Evaluation-Backed Efficiency**: Default non-debate mode eliminates unnecessary LLM calls, saving cost and latency.
+## See it in action
+
+```text
+## swarm-review
+
+security flagged src/api/users.ts:47 - raw user input is passed into query construction.
+principal: blocking until this path uses parameterized queries.
+```
 
 ## How it works
 
@@ -24,14 +33,9 @@ Most AI review tools give you a single uncoordinated opinion. swarm-review gives
 5. If debate is explicitly enabled (`debate.enabled: true` or `debate.rounds > 0`), agents engage in structured rebuttal rounds before principal synthesis.
 6. The action updates the PR comment and, optionally, the check run.
 
-## Evaluation & Architecture Benchmarks
+## Evaluated, not just demoed
 
-Swarm-Review's multi-agent debate architecture has been empirically benchmarked against [SpecBench v0.2](https://github.com/EvanGribar/SpecBench) across 5 distinct review configurations (Single-Agent, Swarm without Debate, Swarm with Debate, Swarm Debate + Static Analysis, and Requirement-Aware SpecBridge).
-
-Key measured findings:
-- **Principal Synthesis Sufficiency**: Independent reviewers plus principal synthesis (`swarm-no-debate`) achieves **100.0% Recall** and **100.0% Precision** on SpecBench v0.2 requirement violation cases. Principal synthesis alone filters false positives without requiring multi-agent debate rounds.
-- **Debate Cost & Latency Penalty**: Structured debate (`swarm-with-debate`) achieves identical 100% precision and recall as non-debate swarm, while adding **+26.2% cost** ($0.0077 vs $0.0061) and **+38.1% runtime latency** (116.4s vs 84.3s).
-- **SpecBridge Requirement Efficiency**: Contract-aware SpecBridge evaluation delivers **98.4% F1** at **22% of the cost** ($0.0017 vs $0.0077) and **27% of the latency** (31.9s vs 116.4s).
+On a controlled 10-case requirement-violation benchmark, independent reviewers plus principal synthesis matched the debate configuration while reducing cost and latency. The benchmark is directional evidence, not a claim of general code-review quality; see the full methodology and raw results:
 
 For detailed methodology, per-case breakdowns, budget controls, and artifact indices, see:
 - [Evaluation Methodology](docs/EVALUATION.md)
