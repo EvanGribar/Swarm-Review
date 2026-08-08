@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+### Changed
+
+* Migrate the opt-in requirement review integration to the consolidated SpecBridge Core and SARIF packages.
+* Remove the former source-submodule and local SARIF bridge dependency; the action now pins public release tarballs and bundles them during release.
+
 ## [1.3.0](https://github.com/EvanGribar/Swarm-Review/compare/swarm-review-v1.2.0...swarm-review-v1.3.0) (2026-07-26)
 
 

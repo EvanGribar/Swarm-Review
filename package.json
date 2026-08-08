@@ -34,6 +34,8 @@
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",
+    "@specbridge/core": "https://github.com/EvanGribar/SpecBridge/releases/download/specbridge-consolidated-v0.4.0/specbridge-core-0.4.0.tgz",
+    "@specbridge/sarif": "https://github.com/EvanGribar/SpecBridge/releases/download/specbridge-consolidated-v0.4.0/specbridge-sarif-0.4.0.tgz",
     "js-yaml": "^4.2.0",
     "zod": "^3.24.1"
   },

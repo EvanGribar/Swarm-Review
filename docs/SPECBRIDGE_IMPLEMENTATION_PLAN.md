@@ -6,7 +6,7 @@ Swarm-Review runs independent finding agents, optional static analysis, sequenti
 
 ## Dependency strategy
 
-SpecBridge 0.1.0 is not published to npm. Pin its source at commit `7555472ea92d5876fa212376d43d40997ae1da81` as a Git submodule. Consume `@specbridge/core` directly and expose the real compiled `@specbridge/sarif` implementation through a tiny local bridge, avoiding its unpublished `workspace:*` manifest reference. The action remains distributable because `ncc` bundles those dependencies. CI checks out submodules before `npm ci`. Once packages are published, replace the local dependencies with exact released versions and remove the submodule/bridge without changing the integration API.
+Swarm Review consumes the consolidated `@specbridge/core` and `@specbridge/sarif` packages from the public SpecBridge GitHub release tarballs pinned in `package.json`. The action remains distributable because `ncc` bundles those dependencies, and CI installs them with a normal `npm ci` without submodules. If a future npm publication is configured, only the dependency URLs need to move to exact registry versions; the integration API remains unchanged.
 
 ## Modules and schema mappings
 
@@ -29,4 +29,4 @@ The configured path is repository-relative, rejects absolute and traversal paths
 
 ## Test and release plan
 
-Add offline tests for configuration, loader safety, duplicate/version validation, evaluator/principal normalization, evidence rules, stable artifacts/SARIF, Markdown escaping, and gate behavior. Preserve current tests. Regenerate `dist/` with the existing bundle command and retain CI's stale-bundle check. Documentation will cover the temporary dependency, configuration, artifacts, SARIF upload workflow, known limits, and future SpecBench consumption boundary.
+Add offline tests for configuration, loader safety, duplicate/version validation, evaluator/principal normalization, evidence rules, stable artifacts/SARIF, Markdown escaping, and gate behavior. Preserve current tests. Regenerate `dist/` with the existing bundle command and retain CI's stale-bundle check. Documentation covers the pinned package channel, configuration, artifacts, SARIF upload workflow, and known limits.
