@@ -102,7 +102,9 @@ export async function callLLMStructured<T>(
         "---",
         "CRITICAL: Your previous response failed validation and could not be parsed.",
         "Your previous response was:",
-        lastResponseText || "[EMPTY RESPONSE]",
+        // Truncate: a hostile or rambling prior output must not persist
+        // verbatim (and unbounded) across paid retries.
+        lastResponseText ? lastResponseText.slice(0, 2_000) : "[EMPTY RESPONSE]",
         "Error details:",
         errorMessage,
         "Please correct your output and respond ONLY with a valid JSON block that perfectly matches the requested schema. Do not include markdown fences, preamble, or other commentary.",

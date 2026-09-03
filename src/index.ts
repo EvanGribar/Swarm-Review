@@ -9,12 +9,13 @@ import { synthesizePrincipalSummary } from "./agents/principal.js";
 import { upsertPullRequestComment, updateCheckRun, parsePositiveInteger, createPullRequestReview, getDeveloperFeedback, resolveReviewEvent } from "./github.js";
 import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_API_ENDPOINT } from "./llm.js";
 import { renderDebateTranscriptMarkdown, formatInlineCommentBody } from "./format.js";
+import { sanitizeModelMarkdown } from "./format.js";
 import { renderRequirementCoverageMarkdown } from "./format.js";
 import { runStaticAnalysis } from "./static_analysis.js";
 import { DEFAULT_PROVIDER_CONFIG, type ProviderConfig, type SwarmConfig, type Finding } from "./types.js";
 import { tokenTracker, resetTokenTracker, calculateEstimatedCost } from "./providers.js";
 import { buildCodebaseIndex } from "./context.js";
-import { isTrustedRereviewActor, parseRereviewCommand } from "./events.js";
+import { isForkPullRequestEvent, isTrustedRereviewActor, parseRereviewCommand } from "./events.js";
 import { configureBudget, getBudgetStatus } from "./budget.js";
 import { loadRequirementContract, normalizeCoverage, shouldRequestChangesForRequirements, writeRequirementArtifacts, coverageStats } from "./requirements.js";
 import { evaluateRequirements } from "./agents/requirements.js";
@@ -184,6 +185,7 @@ async function main(): Promise<void> {
 
   const providerConfig = resolveProviderConfig(swarmConfig, anthropicApiKey, anthropicModel, apiEndpoint);
   registerSecret(providerConfig.config.apiKey);
+  registerSecret(githubToken);
 
   console.log(`Running swarm-review for ${owner}/${repo}#${pullNumber}`);
   console.log(`Using provider: ${providerConfig.type}`);
@@ -192,7 +194,19 @@ async function main(): Promise<void> {
   configureBudget(swarmConfig.budget);
 
   const diff = await fetchPullRequestDiff(octokit, owner, repo, pullNumber);
-  const linterFindings = await runStaticAnalysis(swarmConfig.static_analysis, workspaceRoot);
+  // Fork PRs check out attacker-controlled code: never run local shell
+  // commands there unless the repo explicitly opted in. API-diff review,
+  // debate, and synthesis are unaffected.
+  const staticAnalysisConfig =
+    isForkPullRequestEvent(eventPayload) && !swarmConfig.static_analysis.allow_forks
+      ? (() => {
+          console.log(
+            "::warning::Skipping static analysis: pull request comes from a fork. Set static_analysis.allow_forks to run it anyway."
+          );
+          return { ...swarmConfig.static_analysis, enabled: false };
+        })()
+      : swarmConfig.static_analysis;
+  const linterFindings = await runStaticAnalysis(staticAnalysisConfig, workspaceRoot);
 
   console.log("Building codebase index for AST navigation...");
   const codebaseIndex = buildCodebaseIndex(workspaceRoot, swarmConfig.context_enrichment);
@@ -211,6 +225,9 @@ async function main(): Promise<void> {
 
   const combinedFindings = [...reviewFindings, ...linterFindings];
 
+  // Developer feedback only reaches prompts inside debate rounds. With the
+  // default 0 rounds this stays inert by design: it documents a second
+  // untrusted-input channel that activates exactly when debate is enabled.
   let developerFeedback: string[] = [];
   try {
     developerFeedback = await getDeveloperFeedback(octokit, owner, repo, pullNumber);
@@ -272,7 +289,9 @@ async function main(): Promise<void> {
       : headlineSummary;
 
   const requirementSection = requirementCoverage ? `\n\n${renderRequirementCoverageMarkdown(requirementCoverage)}` : "";
-  const commentBody = `${baseCommentBody}${requirementSection}\n\n${statsBlock}`;
+  // Sanitize before posting: model text can quote secrets from the diff and
+  // embed exfiltration markdown. Fail-safe, not fail-silent.
+  const commentBody = sanitizeModelMarkdown(`${baseCommentBody}${requirementSection}\n\n${statsBlock}`);
 
   const commentResult = await upsertPullRequestComment(octokit, owner, repo, pullNumber, commentBody);
   const checkRunUpdated = await updateCheckRun(octokit, owner, repo, checkRunId, commentBody);

@@ -244,7 +244,7 @@ principal: blocking until this path uses parameterized queries.
 - `diff.max_total_chars`: maximum total characters across all files.
 - `diff.include_patterns`: global list of glob patterns to limit review files (e.g., `["src/**"]`).
 - `diff.exclude_patterns`: global list of glob patterns to exclude files from review (e.g., `["\\.lock$", "package-lock\\.json"]`).
-- `static_analysis.enabled`: whether to run local linter and compiler commands (`true` or `false`).
+- `static_analysis.enabled`: whether to run local linter and compiler commands (`true` or `false`). Commands are skipped on fork PRs unless `static_analysis.allow_forks` is set.
 - `static_analysis.commands`: list of shell commands to run, each with:
   - `name`: the name of the tool (used as the agent name for findings).
   - `run`: the shell command to execute.

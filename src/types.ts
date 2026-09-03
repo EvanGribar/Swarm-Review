@@ -219,6 +219,10 @@ export const StaticAnalysisCommandSchema = z.discriminatedUnion("parser", [
 export const StaticAnalysisConfigSchema = z.object({
   enabled: z.boolean().default(false),
   commands: z.array(StaticAnalysisCommandSchema).default([]),
+  // Fork PRs check out attacker-controlled code, so local shell commands are
+  // skipped there unless explicitly opted in. Diff review via the GitHub API
+  // is unaffected.
+  allow_forks: z.boolean().default(false),
 });
 
 export const ContextEnrichmentConfigSchema = z.object({
@@ -281,6 +285,7 @@ export const SwarmConfigSchema = z.object({
   static_analysis: StaticAnalysisConfigSchema.default({
     enabled: false,
     commands: [],
+    allow_forks: false,
   }),
   context_enrichment: ContextEnrichmentConfigSchema.default({
     enabled: true,

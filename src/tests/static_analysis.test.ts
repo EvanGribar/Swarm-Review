@@ -9,6 +9,7 @@ import { type StaticAnalysisConfig, StaticAnalysisCommandSchema } from "../types
 test("runStaticAnalysis returns empty array when disabled", async () => {
   const config: StaticAnalysisConfig = {
     enabled: false,
+    allow_forks: false,
     commands: [
       {
         name: "test-eslint",
@@ -48,6 +49,7 @@ test("runStaticAnalysis parses ESLint JSON format correctly from stdout", async 
   const escapedJson = JSON.stringify(mockReport).replace(/"/g, '\\"');
   const config: StaticAnalysisConfig = {
     enabled: true,
+    allow_forks: false,
     commands: [
       {
         name: "mock-eslint",
@@ -102,6 +104,7 @@ test("runStaticAnalysis parses ESLint JSON from output file when -o is present",
   // Run a command that does nothing but has -o eslint-output.json in its run script
   const config: StaticAnalysisConfig = {
     enabled: true,
+    allow_forks: false,
     commands: [
       {
         name: "file-eslint",
@@ -128,6 +131,7 @@ test("runStaticAnalysis parses custom regex formats correctly", async () => {
 
   const config: StaticAnalysisConfig = {
     enabled: true,
+    allow_forks: false,
     commands: [
       {
         name: "mock-compiler",
@@ -208,6 +212,7 @@ test("runStaticAnalysis parses ESLint JSON from output file when explicit output
   // Explicitly configure outputFile, but do not use -o flag in run script
   const config: StaticAnalysisConfig = {
     enabled: true,
+    allow_forks: false,
     commands: [
       {
         name: "explicit-eslint",
@@ -228,4 +233,34 @@ test("runStaticAnalysis parses ESLint JSON from output file when explicit output
   assert.equal(findings[0]?.claim, "[explicit-rule] Explicit file parsing error");
 
   await rm(tempDir, { recursive: true, force: true });
+});
+
+test("runStaticAnalysis rejects output files escaping the workspace", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "swarm-test-"));
+  const outsidePath = path.join(os.tmpdir(), "swarm-outside-report.json");
+  await writeFile(outsidePath, JSON.stringify([{ filePath: "evil.ts", messages: [] }]), "utf8");
+
+  try {
+    for (const outputFile of [outsidePath, "../swarm-outside-report.json"]) {
+      const config: StaticAnalysisConfig = {
+        enabled: true,
+        allow_forks: false,
+        commands: [
+          {
+            name: "contained",
+            run: `node -e "console.log('[]')"`,
+            parser: "eslint-json",
+            outputFile,
+          },
+        ],
+      };
+
+      // Must fall back to stdout ("[]") instead of reading outside the workspace.
+      const findings = await runStaticAnalysis(config, tempDir);
+      assert.deepEqual(findings, []);
+    }
+  } finally {
+    await rm(outsidePath, { force: true });
+    await rm(tempDir, { recursive: true, force: true });
+  }
 });

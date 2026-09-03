@@ -29,12 +29,17 @@ jobs:
     env:
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
-      # Security: keep this checkout on the trusted default branch. Do NOT check
-      # out the PR head here — this workflow can access secrets, and the PR diff
-      # is fetched via the GitHub API while static analysis and context
-      # enrichment run against trusted files only.
+      # Trust model: on pull_request this checks out the PR merge commit, which
+      # is attacker-controlled on forks. The action defends in depth: the diff
+      # always comes from the GitHub API, static-analysis shell commands are
+      # skipped on fork PRs unless static_analysis.allow_forks is set, and all
+      # posted text is secret-redacted. For public repos also consider consuming
+      # a pinned release (EvanGribar/Swarm-Review@v1) instead of building ./
+      # so PR-head package.json scripts never run beside your secrets.
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
