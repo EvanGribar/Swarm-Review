@@ -157,6 +157,8 @@ diff:
 static_analysis:
   enabled: false
   commands: []
+  # Never run PR-controlled shell commands on forks unless you accept the risk.
+  # allow_forks: false
 
 context_enrichment:
   enabled: true

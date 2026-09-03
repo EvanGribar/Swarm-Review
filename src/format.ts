@@ -1,8 +1,18 @@
 import type { DebateTranscript, Finding, Severity } from "./types.js";
 import type { ReviewCoverageReport } from "@specbridge/core";
+import { redactSecrets } from "./redact.js";
 
 function escapeMarkdown(value: string): string {
   return value.replace(/[\\`|<>]/g, "\\$&").replace(/\r?\n/g, " ");
+}
+
+// Model output posted to PR comments. Images serve no review purpose and are
+// a data-exfiltration channel (attacker-controlled URLs with secret params),
+// so they are stripped; secrets are masked via redactSecrets.
+const MARKDOWN_IMAGE_PATTERN = /!\[[^\]]*\]\([^)]*\)/g;
+
+export function sanitizeModelMarkdown(value: string): string {
+  return redactSecrets(value.replace(MARKDOWN_IMAGE_PATTERN, "[image removed]"));
 }
 
 const SEVERITY_MARKER: Record<Severity, string> = {
@@ -14,7 +24,7 @@ const SEVERITY_MARKER: Record<Severity, string> = {
 function findingLine(finding: Finding): string {
   const marker = SEVERITY_MARKER[finding.severity];
   const rebuttal = finding.rebuttal_to ? `, rebuttal to ${finding.rebuttal_to}` : "";
-  return `- ${marker} **${finding.agent}** ${finding.file}:${finding.line} (${finding.severity}, ${finding.confidence.toFixed(2)}${rebuttal}) - ${finding.claim}`;
+  return `- ${marker} **${finding.agent}** ${escapeMarkdown(finding.file)}:${finding.line} (${finding.severity}, ${finding.confidence.toFixed(2)}${rebuttal}) - ${escapeMarkdown(finding.claim)}`;
 }
 
 export function renderDebateTranscriptMarkdown(transcript: DebateTranscript): string {
@@ -40,10 +50,10 @@ export function formatInlineCommentBody(finding: Finding, decision?: string): st
   const lines = [
     `### Swarm-Review Finding ${emoji}`,
     `- **Agent**: \`${finding.agent}\` (severity: \`${finding.severity}\`, confidence: \`${finding.confidence.toFixed(2)}\`)`,
-    `- **Claim**: ${finding.claim}`,
+    `- **Claim**: ${sanitizeModelMarkdown(finding.claim)}`,
   ];
   if (decision) {
-    lines.push(`- **🧠 Principal Decision**: ${decision}`);
+    lines.push(`- **🧠 Principal Decision**: ${sanitizeModelMarkdown(decision)}`);
   }
   return lines.join("\n");
 }
