@@ -273,9 +273,6 @@ export function extractSignatures(filePath: string, fileContent: string): string
   const signatures: string[] = [];
 
   for (const node of sourceFile.statements) {
-    // Bind parent so getStart() works accurately with parent references
-    (node as any).parent = sourceFile;
-
     if (ts.isFunctionDeclaration(node)) {
       const sig = node.body
         ? fileContent.slice(node.getStart(), node.body.getStart()).trim()
@@ -288,9 +285,9 @@ export function extractSignatures(filePath: string, fileContent: string): string
 
       const memberSigs: string[] = [];
       for (const member of node.members) {
-        const modifiers = (member as any).modifiers;
+        const modifiers = ts.canHaveModifiers(member) ? ts.getModifiers(member) : undefined;
         const isPublic = !modifiers?.some(
-          (m: any) => m.kind === ts.SyntaxKind.PrivateKeyword || m.kind === ts.SyntaxKind.ProtectedKeyword
+          (m: ts.ModifierLike) => m.kind === ts.SyntaxKind.PrivateKeyword || m.kind === ts.SyntaxKind.ProtectedKeyword
         );
 
         if (ts.isMethodDeclaration(member) || ts.isConstructorDeclaration(member)) {
@@ -315,7 +312,7 @@ export function extractSignatures(filePath: string, fileContent: string): string
     } else if (ts.isTypeAliasDeclaration(node)) {
       signatures.push(node.getText().trim());
     } else if (ts.isVariableStatement(node)) {
-      const isExported = node.modifiers?.some((m: any) => m.kind === ts.SyntaxKind.ExportKeyword);
+      const isExported = node.modifiers?.some((m: ts.ModifierLike) => m.kind === ts.SyntaxKind.ExportKeyword);
       const declarationList = node.declarationList;
       const kind = declarationList.flags & ts.NodeFlags.Const ? "const" : declarationList.flags & ts.NodeFlags.Let ? "let" : "var";
 

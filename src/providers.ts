@@ -1,4 +1,3 @@
-import { z } from "zod";
 import type {
   AnthropicConfig,
   OpenAIConfig,
@@ -20,7 +19,8 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 90_000;
 const MAX_RETRY_ATTEMPTS = 3;
 
 function shouldRetry(statusCode: number): boolean {
-  return statusCode === 408 || statusCode === 409 || statusCode === 429 || statusCode >= 500;
+  // 409 Conflict is not transient for LLM APIs; retrying it only burns budget.
+  return statusCode === 408 || statusCode === 429 || statusCode >= 500;
 }
 
 function waitFor(ms: number): Promise<void> {
@@ -272,8 +272,8 @@ type OpenAICompatibleConfig = {
 
 // Every non-Anthropic provider speaks the OpenAI chat-completions dialect;
 // subclasses differ only by endpoint, auth header, and label.
-abstract class OpenAICompatibleProvider extends BaseProvider {
-  constructor(protected config: OpenAICompatibleConfig) {
+abstract class OpenAICompatibleProvider<C extends OpenAICompatibleConfig = OpenAICompatibleConfig> extends BaseProvider {
+  constructor(protected config: C) {
     super();
   }
 
@@ -384,22 +384,14 @@ class OpenRouterProvider extends OpenAICompatibleProvider {
 class OpenClawProvider extends OpenAICompatibleProvider {
   protected readonly label = "OpenClaw";
   protected defaultEndpoint(): string {
-    return this.config.baseURL ?? "http://localhost:11434/v1";
-  }
-
-  protected resolveEndpoint(): string {
-    return resolveChatCompletionsEndpoint(this.config.baseURL ?? "http://localhost:11434/v1");
+    return "http://localhost:11434/v1";
   }
 }
 
 class HermesProvider extends OpenAICompatibleProvider {
   protected readonly label = "Hermes";
   protected defaultEndpoint(): string {
-    return this.config.baseURL ?? "http://localhost:8080/v1";
-  }
-
-  protected resolveEndpoint(): string {
-    return resolveChatCompletionsEndpoint(this.config.baseURL ?? "http://localhost:8080/v1");
+    return "http://localhost:8080/v1";
   }
 }
 
@@ -452,24 +444,20 @@ class GeminiProvider extends OpenAICompatibleProvider {
   }
 }
 
-class CustomProvider extends OpenAICompatibleProvider {
+class CustomProvider extends OpenAICompatibleProvider<CustomProviderConfig> {
   protected readonly label = "Custom provider";
 
-  constructor(private customConfig: CustomProviderConfig) {
-    super(customConfig);
-  }
-
   protected defaultEndpoint(): string {
-    return this.customConfig.baseURL;
+    return this.config.baseURL;
   }
 
   protected buildHeaders(): Record<string, string> {
     const headers: Record<string, string> = {
       "content-type": "application/json",
-      ...this.customConfig.headers,
+      ...this.config.headers,
     };
     if (!headers["authorization"] && !headers["Authorization"]) {
-      headers["authorization"] = `Bearer ${this.customConfig.apiKey}`;
+      headers["authorization"] = `Bearer ${this.config.apiKey}`;
     }
     return headers;
   }
@@ -478,7 +466,7 @@ class CustomProvider extends OpenAICompatibleProvider {
     const body = payload as ChatCompletionsPayload & {
       content?: Array<{ type: string; text?: string }>;
     };
-    trackChatCompletionsUsage(this.customConfig.model, body.usage);
+    trackChatCompletionsUsage(this.config.model, body.usage);
 
     // Try OpenAI-style response first.
     if (body.choices?.[0]?.message?.content) {

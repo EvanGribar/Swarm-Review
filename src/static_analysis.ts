@@ -74,7 +74,7 @@ async function parseCommandOutput(
   // Support output files if specified in the config or fallback to command regex matching
   let outputFileName = command.outputFile;
   if (!outputFileName) {
-    const fileMatch = command.run.match(/(?:-o|--output-file)\s+(\S+)/);
+    const fileMatch = command.run.match(/(?:-o|--output-file)[=\s]+(\S+)/);
     if (fileMatch) {
       outputFileName = fileMatch[1];
     }

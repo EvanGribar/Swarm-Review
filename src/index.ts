@@ -11,9 +11,9 @@ import { DEFAULT_ANTHROPIC_MODEL, DEFAULT_API_ENDPOINT } from "./llm.js";
 import { renderDebateTranscriptMarkdown, formatInlineCommentBody } from "./format.js";
 import { renderRequirementCoverageMarkdown } from "./format.js";
 import { runStaticAnalysis } from "./static_analysis.js";
-import { DEFAULT_PROVIDER_CONFIG, type ProviderConfig, type SwarmConfig, type Finding } from "./types.js";
+import { type ProviderConfig, type SwarmConfig, type Finding } from "./types.js";
 import { tokenTracker, resetTokenTracker, calculateEstimatedCost } from "./providers.js";
-import { buildCodebaseIndex } from "./context.js";
+import { buildCodebaseIndex, gatherContextForDiff } from "./context.js";
 import { isTrustedRereviewActor, parseRereviewCommand } from "./events.js";
 import { configureBudget, getBudgetStatus } from "./budget.js";
 import { loadRequirementContract, normalizeCoverage, shouldRequestChangesForRequirements, writeRequirementArtifacts, coverageStats } from "./requirements.js";
@@ -244,11 +244,20 @@ async function main(): Promise<void> {
   let requirementCoverage: Awaited<ReturnType<typeof normalizeCoverage>> | undefined;
   let requirementArtifacts: Awaited<ReturnType<typeof writeRequirementArtifacts>> | undefined;
   if (requirementInput) {
+    // Requirement decisions get the same codebase context as reviewers so
+    // fewer criteria fall back to not_verifiable for lack of context.
+    const requirementContext = await gatherContextForDiff(
+      diff,
+      workspaceRoot,
+      swarmConfig.context_enrichment,
+      codebaseIndex
+    );
     const decisions = await evaluateRequirements({
       contract: requirementInput.contract,
       diff,
       providerConfig,
       diffConfig: swarmConfig.diff,
+      codeContext: requirementContext || undefined,
       transcript,
     });
     requirementCoverage = normalizeCoverage(requirementInput.contract, decisions, {
@@ -279,9 +288,10 @@ async function main(): Promise<void> {
 
   const isInline = readInput("inline") === "true" || swarmConfig.output.inline;
   const rawReviewEvent = readInput("review-event") || swarmConfig.output.review_event;
+  const normalizedReviewEvent = rawReviewEvent.trim().toUpperCase();
   let reviewEvent: "COMMENT" | "APPROVE" | "REQUEST_CHANGES" | "AUTO" = "COMMENT";
-  if (rawReviewEvent === "APPROVE" || rawReviewEvent === "REQUEST_CHANGES" || rawReviewEvent === "AUTO") {
-    reviewEvent = rawReviewEvent;
+  if (normalizedReviewEvent === "APPROVE" || normalizedReviewEvent === "REQUEST_CHANGES" || normalizedReviewEvent === "AUTO") {
+    reviewEvent = normalizedReviewEvent;
   }
 
   const acceptedFindings: { finding: Finding; decision?: string }[] = [];
