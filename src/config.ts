@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import yaml from "js-yaml";
+import { load as loadYaml } from "js-yaml";
 
 import {
   DEFAULT_AGENTS,
@@ -162,7 +162,7 @@ export async function loadSwarmConfig(
   }
 
   const rawConfig = await readFile(resolvedConfigPath, "utf8");
-  const parsedConfig = (yaml.load(rawConfig) as Record<string, any>) ?? {};
+  const parsedConfig = (loadYaml(rawConfig) as Record<string, any>) ?? {};
   const mergedConfig = applyPresetDefaults(parsedConfig);
   return SwarmConfigSchema.parse(mergedConfig);
 }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import yaml from "js-yaml";
+import { load as loadYaml } from "js-yaml";
 
 type ActionMetadata = {
   inputs?: Record<string, unknown>;
@@ -22,8 +22,8 @@ test("release and action metadata are valid and aligned with v1", async () => {
     readFile("package-lock.json", "utf8"),
   ]);
 
-  const action = yaml.load(actionText) as ActionMetadata;
-  const release = yaml.load(releaseText) as ReleaseWorkflow;
+  const action = loadYaml(actionText) as ActionMetadata;
+  const release = loadYaml(releaseText) as ReleaseWorkflow;
   const packageJson = JSON.parse(packageText) as { version?: string };
   const packageLock = JSON.parse(lockText) as {
     version?: string;
