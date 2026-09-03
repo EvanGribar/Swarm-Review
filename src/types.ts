@@ -181,7 +181,7 @@ export const CustomProviderConfigSchema = z.object({
   apiKey: z.string().default(""),
   model: z.string().min(1),
   baseURL: z.string().url(),
-  headers: z.record(z.string()).optional(),
+  headers: z.record(z.string(), z.string()).optional(),
 });
 
 export const ProviderConfigSchema = z.discriminatedUnion("type", [
@@ -234,7 +234,7 @@ export const BudgetConfigSchema = z.object({
   max_output_tokens: z.number().int().positive().max(32_768).default(4_096),
   // Optional per-model prices (USD per 1M tokens) for models without known
   // pricing. Lets strict budget caps admit self-hosted or brand-new models.
-  model_prices: z.record(z.object({
+  model_prices: z.record(z.string(), z.object({
     input: z.number().nonnegative(),
     output: z.number().nonnegative(),
   })).optional(),
