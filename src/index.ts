@@ -18,6 +18,7 @@ import { isTrustedRereviewActor, parseRereviewCommand } from "./events.js";
 import { configureBudget, getBudgetStatus } from "./budget.js";
 import { loadRequirementContract, normalizeCoverage, shouldRequestChangesForRequirements, writeRequirementArtifacts, coverageStats } from "./requirements.js";
 import { evaluateRequirements } from "./agents/requirements.js";
+import { redactSecrets, registerSecret } from "./redact.js";
 
 type IssueCommentEventPayload = {
   issue?: { pull_request?: unknown };
@@ -182,6 +183,7 @@ async function main(): Promise<void> {
   const pullNumber = await resolvePullRequestNumber();
 
   const providerConfig = resolveProviderConfig(swarmConfig, anthropicApiKey, anthropicModel, apiEndpoint);
+  registerSecret(providerConfig.config.apiKey);
 
   console.log(`Running swarm-review for ${owner}/${repo}#${pullNumber}`);
   console.log(`Using provider: ${providerConfig.type}`);
@@ -377,6 +379,9 @@ async function main(): Promise<void> {
 }
 
 void main().catch((error: unknown) => {
-  console.error(error);
+  // Redact before logging: errors can carry provider configs or response text.
+  // Keep the stack for debuggability, with secrets masked throughout.
+  const text = error instanceof Error ? (error.stack ?? error.message) : String(error);
+  console.error(redactSecrets(text));
   process.exitCode = 1;
 });
