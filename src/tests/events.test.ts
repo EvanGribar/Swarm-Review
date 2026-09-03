@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  isForkPullRequestEvent,
   isTrustedRereviewActor,
   parseRereviewCommand,
   stripRereviewCommands,
@@ -31,4 +32,25 @@ test("isTrustedRereviewActor restricts paid runs to trusted humans", () => {
   assert.equal(isTrustedRereviewActor("NONE", "User"), false);
   assert.equal(isTrustedRereviewActor("MEMBER", "Bot"), false);
   assert.equal(isTrustedRereviewActor("MEMBER", "bot"), false);
+});
+
+test("isForkPullRequestEvent detects fork PRs only", () => {
+  const fork = {
+    pull_request: {
+      head: { repo: { full_name: "attacker/repo" } },
+      base: { repo: { full_name: "owner/repo" } },
+    },
+  };
+  const sameRepo = {
+    pull_request: {
+      head: { repo: { full_name: "owner/repo" } },
+      base: { repo: { full_name: "owner/repo" } },
+    },
+  };
+
+  assert.equal(isForkPullRequestEvent(fork), true);
+  assert.equal(isForkPullRequestEvent(sameRepo), false);
+  assert.equal(isForkPullRequestEvent({ issue: { number: 1 } }), false);
+  assert.equal(isForkPullRequestEvent(null), false);
+  assert.equal(isForkPullRequestEvent({ pull_request: {} }), false);
 });

@@ -81,10 +81,14 @@ async function parseCommandOutput(
   }
 
   if (outputFileName) {
-    const filePath = path.isAbsolute(outputFileName)
-      ? outputFileName
-      : path.join(workspaceRoot, outputFileName);
-    if (existsSync(filePath)) {
+    // Containment: report files must live inside the workspace. Absolute
+    // paths and `../` escapes are rejected — otherwise a malicious config
+    // could launder arbitrary files (e.g. ~/.npmrc) into review findings.
+    const filePath = path.resolve(workspaceRoot, outputFileName);
+    const relative = path.relative(workspaceRoot, filePath);
+    if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
+      console.error(`Skipping output file for "${command.name}": path escapes the workspace.`);
+    } else if (existsSync(filePath)) {
       try {
         if (statSync(filePath).size > STATIC_ANALYSIS_MAX_BUFFER_BYTES) {
           console.error(
