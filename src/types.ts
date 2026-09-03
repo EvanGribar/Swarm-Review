@@ -128,6 +128,7 @@ export const OpenAIConfigSchema = z.object({
 export const OpenRouterConfigSchema = z.object({
   apiKey: z.string().default(""),
   model: z.string().min(1).default("anthropic/claude-3.5-sonnet"),
+  baseURL: z.string().url().optional(),
 });
 
 export const OpenClawConfigSchema = z.object({
@@ -145,36 +146,43 @@ export const HermesConfigSchema = z.object({
 export const GroqConfigSchema = z.object({
   apiKey: z.string().default(""),
   model: z.string().min(1).default("llama-3.3-70b-versatile"),
+  baseURL: z.string().url().optional(),
 });
 
 export const TogetherConfigSchema = z.object({
   apiKey: z.string().default(""),
   model: z.string().min(1).default("meta-llama/Llama-3.3-70B-Instruct-Turbo"),
+  baseURL: z.string().url().optional(),
 });
 
 export const MistralConfigSchema = z.object({
   apiKey: z.string().default(""),
   model: z.string().min(1).default("mistral-large-latest"),
+  baseURL: z.string().url().optional(),
 });
 
 export const CohereConfigSchema = z.object({
   apiKey: z.string().default(""),
   model: z.string().min(1).default("command-r-plus"),
+  baseURL: z.string().url().optional(),
 });
 
 export const PerplexityConfigSchema = z.object({
   apiKey: z.string().default(""),
   model: z.string().min(1).default("llama-3.1-sonar-small-128k-online"),
+  baseURL: z.string().url().optional(),
 });
 
 export const HyperbolicConfigSchema = z.object({
   apiKey: z.string().default(""),
   model: z.string().min(1).default("meta-llama/Llama-3.3-70B-Instruct"),
+  baseURL: z.string().url().optional(),
 });
 
 export const GeminiConfigSchema = z.object({
   apiKey: z.string().default(""),
   model: z.string().min(1).default("gemini-2.0-flash-exp"),
+  baseURL: z.string().url().optional(),
 });
 
 export const CustomProviderConfigSchema = z.object({
@@ -358,8 +366,3 @@ export type HyperbolicConfig = z.infer<typeof HyperbolicConfigSchema>;
 export type GeminiConfig = z.infer<typeof GeminiConfigSchema>;
 export type CustomProviderConfig = z.infer<typeof CustomProviderConfigSchema>;
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;
-
-export const DEFAULT_PROVIDER_CONFIG: ProviderConfig = {
-  type: "anthropic",
-  config: { apiKey: "", model: "claude-3-5-sonnet-latest" },
-};

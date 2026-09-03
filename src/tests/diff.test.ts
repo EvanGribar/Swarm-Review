@@ -131,6 +131,23 @@ test("getDiffLineNumbers parses unified diff hunk correctly", () => {
   assert.ok(!lineNumbers.has(13));
 });
 
+test("getDiffLineNumbers ignores no-newline markers and headers", () => {
+  const patch = [
+    "@@ -1,2 +1,3 @@",
+    " context",
+    "+added",
+    "\\ No newline at end of file",
+    "+trailing",
+  ].join("\n");
+
+  const lineNumbers = getDiffLineNumbers(patch);
+
+  assert.ok(lineNumbers.has(1));
+  assert.ok(lineNumbers.has(2));
+  assert.ok(lineNumbers.has(3));
+  assert.ok(!lineNumbers.has(4));
+});
+
 test("filterDiffForAgent filters files by glob include/exclude patterns", () => {
   const files: FileDiff[] = [
     { path: "src/foo.ts", status: "modified", additions: 1, deletions: 1, changes: 2, patch: "" },

@@ -168,7 +168,7 @@ export async function createPullRequestReview(
       path: c.path,
       line: c.line,
       body: c.body,
-      side: "RIGHT",
+      side: "RIGHT" as const,
     })),
   });
 }

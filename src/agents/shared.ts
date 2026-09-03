@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { callLLMStructured, normalizeFinding } from "../llm.js";
 import { BudgetExceededError } from "../budget.js";
-import { RawFindingSchema, type Finding, type RawFinding, type ProviderConfig, type AgentConfig } from "../types.js";
+import { RawFindingSchema, ProviderConfigSchema, type Finding, type RawFinding, type ProviderConfig, type AgentConfig } from "../types.js";
 
 const RawFindingArraySchema = z.array(RawFindingSchema);
 
@@ -22,13 +22,13 @@ export function resolveAgentProviderConfig(
   if (!agent.model) {
     return baseConfig;
   }
-  return {
+  return ProviderConfigSchema.parse({
     type: baseConfig.type,
     config: {
       ...baseConfig.config,
       model: agent.model,
     },
-  } as ProviderConfig;
+  });
 }
 
 export async function runAgentFindingRound(options: AgentRoundOptions): Promise<Finding[]> {

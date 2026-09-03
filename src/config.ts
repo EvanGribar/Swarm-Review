@@ -7,6 +7,7 @@ import {
   DEFAULT_AGENTS,
   DEFAULT_DEBATE_CONFIG,
   DEFAULT_PRINCIPAL_MANDATE,
+  ProviderConfigSchema,
   SwarmConfigSchema,
   type SwarmConfig,
   type ProviderConfig,
@@ -68,13 +69,13 @@ export function resolveProviderConfig(
 
   const { type, config } = swarmConfig.provider;
   if (config.apiKey && config.apiKey.length > 0) {
-    return {
+    return ProviderConfigSchema.parse({
       type,
       config: {
         ...config,
         apiKey: resolveApiKeyReference(config.apiKey),
       },
-    } as ProviderConfig;
+    });
   }
 
   const resolvedApiKey = readInput(`${type}-api-key`) || (type === "anthropic" ? legacyAnthropicApiKey : undefined);
@@ -82,13 +83,13 @@ export function resolveProviderConfig(
     throw new Error(`Provider API key is required for ${type}. Please set ${type.toUpperCase()}_API_KEY environment variable.`);
   }
 
-  return {
+  return ProviderConfigSchema.parse({
     type,
     config: {
       ...config,
       apiKey: resolvedApiKey,
     },
-  } as ProviderConfig;
+  });
 }
 
 export function applyPresetDefaults(rawConfig: Record<string, any>): Record<string, any> {
@@ -162,7 +163,19 @@ export async function loadSwarmConfig(
   }
 
   const rawConfig = await readFile(resolvedConfigPath, "utf8");
-  const parsedConfig = (loadYaml(rawConfig) as Record<string, any>) ?? {};
+  // js-yaml v5 throws on empty input instead of returning undefined.
+  if (!rawConfig.trim()) {
+    console.log(`::warning::Config file at ${resolvedConfigPath} is empty, using default configuration.`);
+    return DEFAULT_SWARM_CONFIG;
+  }
+  let parsedConfig: Record<string, any>;
+  try {
+    parsedConfig = (loadYaml(rawConfig) as Record<string, any>) ?? {};
+  } catch (error) {
+    throw new Error(
+      `Unable to parse swarm config YAML: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
   const mergedConfig = applyPresetDefaults(parsedConfig);
   return SwarmConfigSchema.parse(mergedConfig);
 }

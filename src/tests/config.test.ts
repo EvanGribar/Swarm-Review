@@ -12,6 +12,22 @@ test("loadSwarmConfig returns the default config when the file is missing", asyn
   assert.deepEqual(config, DEFAULT_SWARM_CONFIG);
 });
 
+test("loadSwarmConfig returns the default config when the file is empty", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "swarm-review-"));
+  await writeFile(path.join(tempDir, ".swarm.yml"), "  \n", "utf8");
+
+  const config = await loadSwarmConfig(tempDir);
+
+  assert.deepEqual(config, DEFAULT_SWARM_CONFIG);
+});
+
+test("loadSwarmConfig throws a friendly error for invalid YAML", async () => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), "swarm-review-"));
+  await writeFile(path.join(tempDir, ".swarm.yml"), "agents:\n  - name: [unclosed", "utf8");
+
+  await assert.rejects(() => loadSwarmConfig(tempDir), /Unable to parse swarm config YAML/);
+});
+
 test("loadSwarmConfig reads a local config file", async () => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), "swarm-review-"));
   const configPath = path.join(tempDir, ".swarm.yml");

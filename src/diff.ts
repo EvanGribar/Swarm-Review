@@ -230,6 +230,15 @@ export function getDiffLineNumbers(patch: string): Set<number> {
       currentNewLine++;
     } else if (line.startsWith("-")) {
       // Deletion - doesn't increment new line number
+    } else if (
+      line.startsWith("\\") ||
+      line.startsWith("diff --git") ||
+      line.startsWith("index ") ||
+      line.startsWith("--- ") ||
+      line.startsWith("+++ ")
+    ) {
+      // Metadata lines ("\\ No newline at end of file", diff headers) carry
+      // no new-side line numbers and must not shift subsequent lines.
     } else {
       // Context line
       lineNumbers.add(currentNewLine);

@@ -1,7 +1,7 @@
 import { Buffer } from "node:buffer";
 
 import { getModelCostRates, registerCustomModelPrices } from "./providers.js";
-import type { BudgetConfig, ProviderConfig } from "./types.js";
+import { ProviderConfigSchema, type BudgetConfig, type ProviderConfig } from "./types.js";
 
 export class BudgetExceededError extends Error {
   constructor(message: string) {
@@ -42,6 +42,15 @@ export function configureBudget(config: BudgetConfig | undefined): void {
   if (config?.model_prices) {
     registerCustomModelPrices(config.model_prices);
   }
+  if (config?.fallback_model && !getModelCostRates(config.fallback_model)) {
+    // A fallback without known pricing can never be reserved, so every
+    // over-budget call would be skipped instead of downgraded. Warn early.
+    // Note: the fallback is sent to the primary provider's endpoint, so it
+    // must be a model from the same provider family.
+    console.log(
+      `::warning::Budget fallback model ${config.fallback_model} has no known pricing. Add it under budget.model_prices or calls will be skipped instead of downgraded.`
+    );
+  }
 }
 
 export function getBudgetStatus(): Readonly<BudgetState> & { exhausted: boolean } {
@@ -52,13 +61,13 @@ export function getBudgetStatus(): Readonly<BudgetState> & { exhausted: boolean 
 }
 
 function withModel(config: ProviderConfig, model: string): ProviderConfig {
-  return {
+  return ProviderConfigSchema.parse({
     ...config,
     config: {
       ...config.config,
       model,
     },
-  } as ProviderConfig;
+  });
 }
 
 export function estimateCallUpperBoundUsd(
