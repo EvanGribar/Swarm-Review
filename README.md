@@ -79,7 +79,7 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  checks: write
+  # checks: write  # only needed if you pass `check-run-id` to the action
 
 jobs:
   review:
