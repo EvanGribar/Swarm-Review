@@ -1,6 +1,6 @@
 # Swarm-Review Evaluation Results & Architecture Benchmarks
 
-This report presents a controlled, empirical evaluation of Swarm-Review's multi-agent debate architecture against four baseline review configurations across the 10-case **SpecBench v0.2** benchmark suite.
+This report presents a controlled, empirical evaluation of Swarm-Review's multi-agent debate architecture across five review configurations (a single-agent baseline plus four multi-agent and requirement-aware variants) on the 10-case **SpecBench v0.2** benchmark suite.
 
 ---
 
