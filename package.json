@@ -33,7 +33,7 @@
     "validation:specbridge": "npm run build && node -e \"process.env.SWARM_OFFLINE_VALIDATION='1'; import('./dist/tests/specbridge-offline-validation.js')\""
   },
   "dependencies": {
-    "@octokit/rest": "^21.0.2",
+    "@octokit/rest": "^22.0.1",
     "@specbridge/core": "https://github.com/EvanGribar/SpecBridge/releases/download/specbridge-consolidated-v0.4.0/specbridge-core-0.4.0.tgz",
     "@specbridge/sarif": "https://github.com/EvanGribar/SpecBridge/releases/download/specbridge-consolidated-v0.4.0/specbridge-sarif-0.4.0.tgz",
     "js-yaml": "^4.3.1",

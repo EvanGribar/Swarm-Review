@@ -48,7 +48,11 @@ export function clearContextCaches(): void {
  * Loads tsconfig.json paths and baseUrl configuration from the workspace root.
  */
 export function loadTsConfigPaths(workspaceRoot: string): TsConfigPaths {
-  const tsconfigPath = path.resolve(workspaceRoot, "tsconfig.json");
+  // NOTE: do not use path.resolve()/path.join() with a string literal here.
+  // ncc statically evaluates such calls against the build machine and bakes
+  // the absolute path into dist, breaking tsconfig lookup at runtime (and
+  // the committed-bundle check in CI). A template literal is opaque to it.
+  const tsconfigPath = `${workspaceRoot}${path.sep}tsconfig.json`;
   if (!existsSync(tsconfigPath)) {
     return {};
   }
