@@ -1,11 +1,17 @@
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { StaticAnalysisConfig, StaticAnalysisCommand, Finding } from "./types.js";
 
 const execAsync = promisify(exec);
+
+// Bounds for untrusted-workspace command execution. Commands come from the
+// trusted `.swarm.yml` config, but their output volume and runtime are not
+// trusted — cap both so one noisy linter cannot hang or OOM the action.
+const STATIC_ANALYSIS_TIMEOUT_MS = 120_000;
+const STATIC_ANALYSIS_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
 
 export async function runStaticAnalysis(
   config: StaticAnalysisConfig,
@@ -26,7 +32,11 @@ export async function runStaticAnalysis(
       let stderr = "";
 
       try {
-        const result = await execAsync(command.run, { cwd: workspaceRoot });
+        const result = await execAsync(command.run, {
+          cwd: workspaceRoot,
+          timeout: STATIC_ANALYSIS_TIMEOUT_MS,
+          maxBuffer: STATIC_ANALYSIS_MAX_BUFFER_BYTES,
+        });
         stdout = result.stdout;
         stderr = result.stderr;
       } catch (error: any) {
@@ -76,7 +86,13 @@ async function parseCommandOutput(
       : path.join(workspaceRoot, outputFileName);
     if (existsSync(filePath)) {
       try {
-        content = await readFile(filePath, "utf8");
+        if (statSync(filePath).size > STATIC_ANALYSIS_MAX_BUFFER_BYTES) {
+          console.error(
+            `Skipping output file ${filePath} for "${command.name}": exceeds ${STATIC_ANALYSIS_MAX_BUFFER_BYTES} bytes.`
+          );
+        } else {
+          content = await readFile(filePath, "utf8");
+        }
       } catch (err) {
         console.error(`Failed to read output file ${filePath} for "${command.name}":`, err);
       }

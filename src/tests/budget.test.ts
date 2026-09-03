@@ -138,3 +138,21 @@ test("principal synthesis defers findings when its call cannot fit", async (t) =
   assert.equal(summary.final_calls[0]?.status, "deferred");
   assert.match(summary.summary, /budget was exhausted/i);
 });
+
+test("budget guard admits unknown models with configured model_prices", (t) => {
+  t.after(() => configureBudget(undefined));
+  configureBudget({
+    max_cost_usd: 1,
+    max_output_tokens: 1_000,
+    model_prices: { "my-self-hosted-model": { input: 1.0, output: 3.0 } },
+  });
+
+  const custom: ProviderConfig = {
+    type: "custom",
+    config: { apiKey: "test", model: "my-self-hosted-model", baseURL: "https://example.com/v1" },
+  };
+  const reservation = reserveBudgetedCall(custom, "system", "prompt", 1_000);
+
+  assert.equal(reservation.providerConfig.config.model, "my-self-hosted-model");
+  assert.ok(reservation.reservedUsd > 0);
+});

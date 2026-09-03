@@ -85,7 +85,15 @@ export function resetTokenTracker() {
   tokenTracker.totalCalls = 0;
 }
 
+// Prices are USD per 1M tokens. Provider pricing changes frequently — treat
+// this table as a conservative default and override per-run with
+// `budget.model_prices` in `.swarm.yml` when you need exact accounting.
 export const MODEL_COSTS: Record<string, { input: number; output: number }> = {
+  "claude-opus-4-1": { input: 15.0, output: 75.0 },
+  "claude-opus-4-latest": { input: 15.0, output: 75.0 },
+  "claude-sonnet-4-latest": { input: 3.0, output: 15.0 },
+  "claude-3-7-sonnet-latest": { input: 3.0, output: 15.0 },
+  "claude-3-7-sonnet-20250219": { input: 3.0, output: 15.0 },
   "claude-3-5-sonnet-latest": { input: 3.0, output: 15.0 },
   "claude-3-5-sonnet-20241022": { input: 3.0, output: 15.0 },
   "claude-3-5-sonnet-20240620": { input: 3.0, output: 15.0 },
@@ -93,20 +101,51 @@ export const MODEL_COSTS: Record<string, { input: number; output: number }> = {
   "claude-3-opus-20240229": { input: 15.0, output: 75.0 },
   "claude-3-5-haiku-latest": { input: 0.8, output: 4.0 },
   "claude-3-5-haiku-20241022": { input: 0.8, output: 4.0 },
+  "claude-3-haiku-20240307": { input: 0.25, output: 1.25 },
+  "gpt-5": { input: 1.25, output: 10.0 },
+  "gpt-5-mini": { input: 0.25, output: 2.0 },
+  "gpt-5-nano": { input: 0.05, output: 0.4 },
+  "gpt-4.1": { input: 2.0, output: 8.0 },
+  "gpt-4.1-mini": { input: 0.4, output: 1.6 },
+  "gpt-4.1-nano": { input: 0.1, output: 0.4 },
   "gpt-4o": { input: 2.5, output: 10.0 },
   "gpt-4o-2024-08-06": { input: 2.5, output: 10.0 },
   "gpt-4o-2024-05-13": { input: 5.0, output: 15.0 },
-  "gpt-4o-mini": { input: 0.15, output: 0.60 },
-  "gpt-4o-mini-2024-07-18": { input: 0.15, output: 0.60 },
+  "gpt-4o-mini": { input: 0.15, output: 0.6 },
+  "gpt-4o-mini-2024-07-18": { input: 0.15, output: 0.6 },
+  "o3": { input: 2.0, output: 8.0 },
+  "o4-mini": { input: 1.1, output: 4.4 },
   "o1-preview": { input: 15.0, output: 60.0 },
   "o1-mini": { input: 3.0, output: 12.0 },
-  "gemini-2.5-pro": { input: 1.25, output: 5.00 },
-  "gemini-2.5-flash": { input: 0.075, output: 0.30 },
+  "gemini-2.5-pro": { input: 1.25, output: 5.0 },
+  "gemini-2.5-flash": { input: 0.075, output: 0.3 },
   "gemini-2.0-pro-exp": { input: 0.0, output: 0.0 },
-  "gemini-2.0-flash": { input: 0.075, output: 0.30 },
-  "gemini-1.5-pro": { input: 1.25, output: 5.00 },
-  "gemini-1.5-flash": { input: 0.075, output: 0.30 },
+  "gemini-2.0-flash": { input: 0.075, output: 0.3 },
+  "gemini-2.0-flash-exp": { input: 0.0, output: 0.0 },
+  "gemini-1.5-pro": { input: 1.25, output: 5.0 },
+  "gemini-1.5-flash": { input: 0.075, output: 0.3 },
+  "llama-3.3-70b-versatile": { input: 0.59, output: 0.79 },
+  "meta-llama/llama-3.3-70b-instruct-turbo": { input: 0.88, output: 0.88 },
+  "meta-llama/llama-3.3-70b-instruct": { input: 0.88, output: 0.88 },
+  "mistral-large-latest": { input: 2.0, output: 6.0 },
+  "mistral-medium-latest": { input: 0.4, output: 2.0 },
+  "mistral-small-latest": { input: 0.1, output: 0.3 },
+  "command-r-plus": { input: 2.5, output: 10.0 },
+  "command-r": { input: 0.15, output: 0.6 },
+  "llama-3.1-sonar-small-128k-online": { input: 0.2, output: 0.2 },
+  "llama-3.1-sonar-large-128k-online": { input: 1.0, output: 1.0 },
+  "kimi-k2.5:cloud": { input: 1.0, output: 3.0 },
+  "kimi-k2": { input: 1.0, output: 3.0 },
 };
+
+// Merges user-supplied prices (e.g. from `budget.model_prices`) into the
+// shared table so strict budget caps can admit models without known pricing.
+export function registerCustomModelPrices(prices: Record<string, { input: number; output: number }>): void {
+  for (const [model, rates] of Object.entries(prices)) {
+    MODEL_COSTS[model] = rates;
+    MODEL_COSTS[model.toLowerCase()] = rates;
+  }
+}
 
 export function getModelCostRates(model: string): { input: number; output: number } | undefined {
   const normalizedModel = model.toLowerCase();
@@ -140,11 +179,41 @@ export interface LLMProvider {
   call(system: string, prompt: string, maxTokens?: number): Promise<string>;
 }
 
-class AnthropicProvider implements LLMProvider {
-  constructor(private config: AnthropicConfig) {}
+type ChatCompletionsUsage = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+};
+
+type ChatCompletionsPayload = {
+  choices?: Array<{ message?: { content?: string } }>;
+  usage?: ChatCompletionsUsage;
+};
+
+function trackChatCompletionsUsage(model: string, usage: ChatCompletionsUsage | undefined): void {
+  if (!usage) {
+    return;
+  }
+  trackTokens(
+    model,
+    usage.prompt_tokens ?? usage.input_tokens ?? 0,
+    usage.completion_tokens ?? usage.output_tokens ?? 0
+  );
+}
+
+// Shared retry/timeout/backoff loop for every provider. Subclasses only
+// describe their endpoint, headers, request body, and response parsing.
+abstract class BaseProvider implements LLMProvider {
+  protected abstract readonly label: string;
+
+  protected abstract resolveEndpoint(): string;
+  protected abstract buildHeaders(): Record<string, string>;
+  protected abstract buildBody(system: string, prompt: string, maxTokens: number): unknown;
+  protected abstract parseText(payload: unknown): string;
 
   async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = resolveAnthropicEndpoint(this.config.baseURL);
+    const endpoint = this.resolveEndpoint();
     let lastError: Error | undefined;
 
     for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
@@ -156,18 +225,8 @@ class AnthropicProvider implements LLMProvider {
       try {
         const response = await fetch(endpoint, {
           method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-api-key": this.config.apiKey,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: maxTokens,
-            temperature: 0.2,
-            system,
-            messages: [{ role: "user", content: prompt }],
-          }),
+          headers: this.buildHeaders(),
+          body: JSON.stringify(this.buildBody(system, prompt, maxTokens)),
           signal: abortController.signal,
         });
 
@@ -178,29 +237,12 @@ class AnthropicProvider implements LLMProvider {
             retryDelayMs = Math.max(retryDelayMs, retryAfterSeconds * 1000);
           }
 
-          const error = new Error(
-            `Anthropic request failed with ${response.status}: ${await response.text()}`
-          );
+          const error = new Error(`${this.label} request failed with ${response.status}: ${await response.text()}`);
           retryableFailure = shouldRetry(response.status);
           throw error;
         }
 
-        const payload: {
-          content?: Array<{ type: string; text?: string }>;
-          usage?: { input_tokens?: number; output_tokens?: number };
-        } = await response.json();
-
-        if (payload.usage) {
-          trackTokens(this.config.model, payload.usage.input_tokens ?? 0, payload.usage.output_tokens ?? 0);
-        }
-
-        return (payload.content ?? [])
-          .filter(
-            (block): block is { type: string; text: string } =>
-              block.type === "text" && typeof block.text === "string"
-          )
-          .map((block) => block.text)
-          .join("");
+        return this.parseText(await response.json());
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         if (lastError.name === "AbortError" || lastError instanceof TypeError) {
@@ -217,952 +259,241 @@ class AnthropicProvider implements LLMProvider {
       }
     }
 
-    throw lastError ?? new Error("Anthropic request failed unexpectedly.");
+    throw lastError ?? new Error(`${this.label} request failed unexpectedly.`);
   }
 }
 
-class OpenAIProvider implements LLMProvider {
-  constructor(private config: OpenAIConfig) {}
+type OpenAICompatibleConfig = {
+  apiKey: string;
+  model: string;
+  baseURL?: string;
+  headers?: Record<string, string>;
+};
 
-  async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = resolveChatCompletionsEndpoint(
-      this.config.baseURL || "https://api.openai.com/v1/chat/completions"
-    );
-    let lastError: Error | undefined;
+// Every non-Anthropic provider speaks the OpenAI chat-completions dialect;
+// subclasses differ only by endpoint, auth header, and label.
+abstract class OpenAICompatibleProvider extends BaseProvider {
+  constructor(protected config: OpenAICompatibleConfig) {
+    super();
+  }
 
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
-      let retryableFailure = false;
-      let retryDelayMs = 500 * 2 ** (attempt - 1);
+  protected abstract defaultEndpoint(): string;
 
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${this.config.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: maxTokens,
-            temperature: 0.2,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: prompt },
-            ],
-          }),
-          signal: abortController.signal,
-        });
+  protected resolveEndpoint(): string {
+    return resolveChatCompletionsEndpoint(this.config.baseURL || this.defaultEndpoint());
+  }
 
-        if (!response.ok) {
-          const retryAfterHeader = response.headers.get("retry-after");
-          const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-          if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-            retryDelayMs = Math.max(retryDelayMs, retryAfterSeconds * 1000);
-          }
+  protected buildHeaders(): Record<string, string> {
+    return {
+      "content-type": "application/json",
+      authorization: `Bearer ${this.config.apiKey}`,
+      ...this.config.headers,
+    };
+  }
 
-          const error = new Error(
-            `OpenAI request failed with ${response.status}: ${await response.text()}`
-          );
-          retryableFailure = shouldRetry(response.status);
-          throw error;
-        }
+  protected buildBody(system: string, prompt: string, maxTokens: number): unknown {
+    return {
+      model: this.config.model,
+      max_tokens: maxTokens,
+      temperature: 0.2,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: prompt },
+      ],
+    };
+  }
 
-        const payload: {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        } = await response.json();
-
-        if (payload.usage) {
-          trackTokens(this.config.model, payload.usage.prompt_tokens ?? 0, payload.usage.completion_tokens ?? 0);
-        }
-
-        return payload.choices?.[0]?.message?.content ?? "";
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (lastError.name === "AbortError" || lastError instanceof TypeError) {
-          retryableFailure = true;
-        }
-
-        if (attempt < MAX_RETRY_ATTEMPTS && retryableFailure) {
-          await waitFor(addJitter(retryDelayMs));
-          continue;
-        }
-        throw lastError;
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-
-    throw lastError ?? new Error("OpenAI request failed unexpectedly.");
+  protected parseText(payload: unknown): string {
+    const body = payload as ChatCompletionsPayload;
+    trackChatCompletionsUsage(this.config.model, body.usage);
+    return body.choices?.[0]?.message?.content ?? "";
   }
 }
 
-class OpenRouterProvider implements LLMProvider {
-  constructor(private config: OpenRouterConfig) {}
+class AnthropicProvider extends BaseProvider {
+  protected readonly label = "Anthropic";
 
-  async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = "https://openrouter.ai/api/v1/chat/completions";
-    let lastError: Error | undefined;
+  constructor(private config: AnthropicConfig) {
+    super();
+  }
 
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
-      let retryableFailure = false;
-      let retryDelayMs = 500 * 2 ** (attempt - 1);
+  protected resolveEndpoint(): string {
+    return resolveAnthropicEndpoint(this.config.baseURL);
+  }
 
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${this.config.apiKey}`,
-            "HTTP-Referer": "https://github.com/EvanGribar/Swarm-Review",
-            "X-Title": "Swarm Review",
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: maxTokens,
-            temperature: 0.2,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: prompt },
-            ],
-          }),
-          signal: abortController.signal,
-        });
+  protected buildHeaders(): Record<string, string> {
+    return {
+      "content-type": "application/json",
+      "x-api-key": this.config.apiKey,
+      "anthropic-version": "2023-06-01",
+    };
+  }
 
-        if (!response.ok) {
-          const retryAfterHeader = response.headers.get("retry-after");
-          const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-          if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-            retryDelayMs = Math.max(retryDelayMs, retryAfterSeconds * 1000);
-          }
+  protected buildBody(system: string, prompt: string, maxTokens: number): unknown {
+    return {
+      model: this.config.model,
+      max_tokens: maxTokens,
+      temperature: 0.2,
+      system,
+      messages: [{ role: "user", content: prompt }],
+    };
+  }
 
-          const error = new Error(
-            `OpenRouter request failed with ${response.status}: ${await response.text()}`
-          );
-          retryableFailure = shouldRetry(response.status);
-          throw error;
-        }
-
-        const payload: {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        } = await response.json();
-
-        if (payload.usage) {
-          trackTokens(this.config.model, payload.usage.prompt_tokens ?? 0, payload.usage.completion_tokens ?? 0);
-        }
-
-        return payload.choices?.[0]?.message?.content ?? "";
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (lastError.name === "AbortError" || lastError instanceof TypeError) {
-          retryableFailure = true;
-        }
-
-        if (attempt < MAX_RETRY_ATTEMPTS && retryableFailure) {
-          await waitFor(addJitter(retryDelayMs));
-          continue;
-        }
-        throw lastError;
-      } finally {
-        clearTimeout(timeout);
-      }
+  protected parseText(payload: unknown): string {
+    const body = payload as {
+      content?: Array<{ type: string; text?: string }>;
+      usage?: { input_tokens?: number; output_tokens?: number };
+    };
+    if (body.usage) {
+      trackTokens(this.config.model, body.usage.input_tokens ?? 0, body.usage.output_tokens ?? 0);
     }
-
-    throw lastError ?? new Error("OpenRouter request failed unexpectedly.");
+    return (body.content ?? [])
+      .filter((block): block is { type: string; text: string } => block.type === "text" && typeof block.text === "string")
+      .map((block) => block.text)
+      .join("");
   }
 }
 
-class OpenClawProvider implements LLMProvider {
-  constructor(private config: OpenClawConfig) {}
-
-  async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = resolveChatCompletionsEndpoint(this.config.baseURL);
-    let lastError: Error | undefined;
-
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
-      let retryableFailure = false;
-      let retryDelayMs = 500 * 2 ** (attempt - 1);
-
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${this.config.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: maxTokens,
-            temperature: 0.2,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: prompt },
-            ],
-          }),
-          signal: abortController.signal,
-        });
-
-        if (!response.ok) {
-          const retryAfterHeader = response.headers.get("retry-after");
-          const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-          if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-            retryDelayMs = Math.max(retryDelayMs, retryAfterSeconds * 1000);
-          }
-
-          const error = new Error(
-            `OpenClaw request failed with ${response.status}: ${await response.text()}`
-          );
-          retryableFailure = shouldRetry(response.status);
-          throw error;
-        }
-
-        const payload: {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        } = await response.json();
-
-        if (payload.usage) {
-          trackTokens(this.config.model, payload.usage.prompt_tokens ?? 0, payload.usage.completion_tokens ?? 0);
-        }
-
-        return payload.choices?.[0]?.message?.content ?? "";
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (lastError.name === "AbortError" || lastError instanceof TypeError) {
-          retryableFailure = true;
-        }
-
-        if (attempt < MAX_RETRY_ATTEMPTS && retryableFailure) {
-          await waitFor(addJitter(retryDelayMs));
-          continue;
-        }
-        throw lastError;
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-
-    throw lastError ?? new Error("OpenClaw request failed unexpectedly.");
+class OpenAIProvider extends OpenAICompatibleProvider {
+  protected readonly label = "OpenAI";
+  protected defaultEndpoint(): string {
+    return "https://api.openai.com/v1/chat/completions";
   }
 }
 
-class HermesProvider implements LLMProvider {
-  constructor(private config: HermesConfig) {}
+class OpenRouterProvider extends OpenAICompatibleProvider {
+  protected readonly label = "OpenRouter";
 
-  async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = resolveChatCompletionsEndpoint(this.config.baseURL);
-    let lastError: Error | undefined;
+  constructor(config: OpenRouterConfig) {
+    super(config);
+  }
 
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
-      let retryableFailure = false;
-      let retryDelayMs = 500 * 2 ** (attempt - 1);
+  protected defaultEndpoint(): string {
+    return "https://openrouter.ai/api/v1/chat/completions";
+  }
 
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${this.config.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: maxTokens,
-            temperature: 0.2,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: prompt },
-            ],
-          }),
-          signal: abortController.signal,
-        });
-
-        if (!response.ok) {
-          const retryAfterHeader = response.headers.get("retry-after");
-          const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-          if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-            retryDelayMs = Math.max(retryDelayMs, retryAfterSeconds * 1000);
-          }
-
-          const error = new Error(
-            `Hermes request failed with ${response.status}: ${await response.text()}`
-          );
-          retryableFailure = shouldRetry(response.status);
-          throw error;
-        }
-
-        const payload: {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        } = await response.json();
-
-        if (payload.usage) {
-          trackTokens(this.config.model, payload.usage.prompt_tokens ?? 0, payload.usage.completion_tokens ?? 0);
-        }
-
-        return payload.choices?.[0]?.message?.content ?? "";
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (lastError.name === "AbortError" || lastError instanceof TypeError) {
-          retryableFailure = true;
-        }
-
-        if (attempt < MAX_RETRY_ATTEMPTS && retryableFailure) {
-          await waitFor(addJitter(retryDelayMs));
-          continue;
-        }
-        throw lastError;
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-
-    throw lastError ?? new Error("Hermes request failed unexpectedly.");
+  protected buildHeaders(): Record<string, string> {
+    return {
+      ...super.buildHeaders(),
+      "HTTP-Referer": "https://github.com/EvanGribar/Swarm-Review",
+      "X-Title": "Swarm Review",
+    };
   }
 }
 
-class GroqProvider implements LLMProvider {
-  constructor(private config: GroqConfig) {}
+class OpenClawProvider extends OpenAICompatibleProvider {
+  protected readonly label = "OpenClaw";
+  protected defaultEndpoint(): string {
+    return this.config.baseURL ?? "http://localhost:11434/v1";
+  }
 
-  async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = "https://api.groq.com/openai/v1/chat/completions";
-    let lastError: Error | undefined;
-
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
-      let retryableFailure = false;
-      let retryDelayMs = 500 * 2 ** (attempt - 1);
-
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${this.config.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: maxTokens,
-            temperature: 0.2,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: prompt },
-            ],
-          }),
-          signal: abortController.signal,
-        });
-
-        if (!response.ok) {
-          const retryAfterHeader = response.headers.get("retry-after");
-          const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-          if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-            retryDelayMs = Math.max(retryDelayMs, retryAfterSeconds * 1000);
-          }
-
-          const error = new Error(
-            `Groq request failed with ${response.status}: ${await response.text()}`
-          );
-          retryableFailure = shouldRetry(response.status);
-          throw error;
-        }
-
-        const payload: {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        } = await response.json();
-
-        if (payload.usage) {
-          trackTokens(this.config.model, payload.usage.prompt_tokens ?? 0, payload.usage.completion_tokens ?? 0);
-        }
-
-        return payload.choices?.[0]?.message?.content ?? "";
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (lastError.name === "AbortError" || lastError instanceof TypeError) {
-          retryableFailure = true;
-        }
-
-        if (attempt < MAX_RETRY_ATTEMPTS && retryableFailure) {
-          await waitFor(addJitter(retryDelayMs));
-          continue;
-        }
-        throw lastError;
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-
-    throw lastError ?? new Error("Groq request failed unexpectedly.");
+  protected resolveEndpoint(): string {
+    return resolveChatCompletionsEndpoint(this.config.baseURL ?? "http://localhost:11434/v1");
   }
 }
 
-class TogetherProvider implements LLMProvider {
-  constructor(private config: TogetherConfig) {}
+class HermesProvider extends OpenAICompatibleProvider {
+  protected readonly label = "Hermes";
+  protected defaultEndpoint(): string {
+    return this.config.baseURL ?? "http://localhost:8080/v1";
+  }
 
-  async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = "https://api.together.xyz/v1/chat/completions";
-    let lastError: Error | undefined;
-
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
-      let retryableFailure = false;
-      let retryDelayMs = 500 * 2 ** (attempt - 1);
-
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${this.config.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: maxTokens,
-            temperature: 0.2,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: prompt },
-            ],
-          }),
-          signal: abortController.signal,
-        });
-
-        if (!response.ok) {
-          const retryAfterHeader = response.headers.get("retry-after");
-          const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-          if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-            retryDelayMs = Math.max(retryDelayMs, retryAfterSeconds * 1000);
-          }
-
-          const error = new Error(
-            `Together request failed with ${response.status}: ${await response.text()}`
-          );
-          retryableFailure = shouldRetry(response.status);
-          throw error;
-        }
-
-        const payload: {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        } = await response.json();
-
-        if (payload.usage) {
-          trackTokens(this.config.model, payload.usage.prompt_tokens ?? 0, payload.usage.completion_tokens ?? 0);
-        }
-
-        return payload.choices?.[0]?.message?.content ?? "";
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (lastError.name === "AbortError" || lastError instanceof TypeError) {
-          retryableFailure = true;
-        }
-
-        if (attempt < MAX_RETRY_ATTEMPTS && retryableFailure) {
-          await waitFor(addJitter(retryDelayMs));
-          continue;
-        }
-        throw lastError;
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-
-    throw lastError ?? new Error("Together request failed unexpectedly.");
+  protected resolveEndpoint(): string {
+    return resolveChatCompletionsEndpoint(this.config.baseURL ?? "http://localhost:8080/v1");
   }
 }
 
-class MistralProvider implements LLMProvider {
-  constructor(private config: MistralConfig) {}
-
-  async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = "https://api.mistral.ai/v1/chat/completions";
-    let lastError: Error | undefined;
-
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
-      let retryableFailure = false;
-      let retryDelayMs = 500 * 2 ** (attempt - 1);
-
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${this.config.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: maxTokens,
-            temperature: 0.2,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: prompt },
-            ],
-          }),
-          signal: abortController.signal,
-        });
-
-        if (!response.ok) {
-          const retryAfterHeader = response.headers.get("retry-after");
-          const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-          if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-            retryDelayMs = Math.max(retryDelayMs, retryAfterSeconds * 1000);
-          }
-
-          const error = new Error(
-            `Mistral request failed with ${response.status}: ${await response.text()}`
-          );
-          retryableFailure = shouldRetry(response.status);
-          throw error;
-        }
-
-        const payload: {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        } = await response.json();
-
-        if (payload.usage) {
-          trackTokens(this.config.model, payload.usage.prompt_tokens ?? 0, payload.usage.completion_tokens ?? 0);
-        }
-
-        return payload.choices?.[0]?.message?.content ?? "";
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (lastError.name === "AbortError" || lastError instanceof TypeError) {
-          retryableFailure = true;
-        }
-
-        if (attempt < MAX_RETRY_ATTEMPTS && retryableFailure) {
-          await waitFor(addJitter(retryDelayMs));
-          continue;
-        }
-        throw lastError;
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-
-    throw lastError ?? new Error("Mistral request failed unexpectedly.");
+class GroqProvider extends OpenAICompatibleProvider {
+  protected readonly label = "Groq";
+  protected defaultEndpoint(): string {
+    return "https://api.groq.com/openai/v1/chat/completions";
   }
 }
 
-class CohereProvider implements LLMProvider {
-  constructor(private config: CohereConfig) {}
-
-  async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = "https://api.cohere.com/v1/chat/completions";
-    let lastError: Error | undefined;
-
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
-      let retryableFailure = false;
-      let retryDelayMs = 500 * 2 ** (attempt - 1);
-
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${this.config.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: maxTokens,
-            temperature: 0.2,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: prompt },
-            ],
-          }),
-          signal: abortController.signal,
-        });
-
-        if (!response.ok) {
-          const retryAfterHeader = response.headers.get("retry-after");
-          const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-          if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-            retryDelayMs = Math.max(retryDelayMs, retryAfterSeconds * 1000);
-          }
-
-          const error = new Error(
-            `Cohere request failed with ${response.status}: ${await response.text()}`
-          );
-          retryableFailure = shouldRetry(response.status);
-          throw error;
-        }
-
-        const payload: {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        } = await response.json();
-
-        if (payload.usage) {
-          trackTokens(this.config.model, payload.usage.prompt_tokens ?? 0, payload.usage.completion_tokens ?? 0);
-        }
-
-        return payload.choices?.[0]?.message?.content ?? "";
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (lastError.name === "AbortError" || lastError instanceof TypeError) {
-          retryableFailure = true;
-        }
-
-        if (attempt < MAX_RETRY_ATTEMPTS && retryableFailure) {
-          await waitFor(addJitter(retryDelayMs));
-          continue;
-        }
-        throw lastError;
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-
-    throw lastError ?? new Error("Cohere request failed unexpectedly.");
+class TogetherProvider extends OpenAICompatibleProvider {
+  protected readonly label = "Together";
+  protected defaultEndpoint(): string {
+    return "https://api.together.xyz/v1/chat/completions";
   }
 }
 
-class PerplexityProvider implements LLMProvider {
-  constructor(private config: PerplexityConfig) {}
-
-  async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = "https://api.perplexity.ai/chat/completions";
-    let lastError: Error | undefined;
-
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
-      let retryableFailure = false;
-      let retryDelayMs = 500 * 2 ** (attempt - 1);
-
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${this.config.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: maxTokens,
-            temperature: 0.2,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: prompt },
-            ],
-          }),
-          signal: abortController.signal,
-        });
-
-        if (!response.ok) {
-          const retryAfterHeader = response.headers.get("retry-after");
-          const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-          if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-            retryDelayMs = Math.max(retryDelayMs, retryAfterSeconds * 1000);
-          }
-
-          const error = new Error(
-            `Perplexity request failed with ${response.status}: ${await response.text()}`
-          );
-          retryableFailure = shouldRetry(response.status);
-          throw error;
-        }
-
-        const payload: {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        } = await response.json();
-
-        if (payload.usage) {
-          trackTokens(this.config.model, payload.usage.prompt_tokens ?? 0, payload.usage.completion_tokens ?? 0);
-        }
-
-        return payload.choices?.[0]?.message?.content ?? "";
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (lastError.name === "AbortError" || lastError instanceof TypeError) {
-          retryableFailure = true;
-        }
-
-        if (attempt < MAX_RETRY_ATTEMPTS && retryableFailure) {
-          await waitFor(addJitter(retryDelayMs));
-          continue;
-        }
-        throw lastError;
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-
-    throw lastError ?? new Error("Perplexity request failed unexpectedly.");
+class MistralProvider extends OpenAICompatibleProvider {
+  protected readonly label = "Mistral";
+  protected defaultEndpoint(): string {
+    return "https://api.mistral.ai/v1/chat/completions";
   }
 }
 
-class HyperbolicProvider implements LLMProvider {
-  constructor(private config: HyperbolicConfig) {}
-
-  async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = "https://api.hyperbolic.xyz/v1/chat/completions";
-    let lastError: Error | undefined;
-
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
-      let retryableFailure = false;
-      let retryDelayMs = 500 * 2 ** (attempt - 1);
-
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${this.config.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: maxTokens,
-            temperature: 0.2,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: prompt },
-            ],
-          }),
-          signal: abortController.signal,
-        });
-
-        if (!response.ok) {
-          const retryAfterHeader = response.headers.get("retry-after");
-          const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-          if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-            retryDelayMs = Math.max(retryDelayMs, retryAfterSeconds * 1000);
-          }
-
-          const error = new Error(
-            `Hyperbolic request failed with ${response.status}: ${await response.text()}`
-          );
-          retryableFailure = shouldRetry(response.status);
-          throw error;
-        }
-
-        const payload: {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        } = await response.json();
-
-        if (payload.usage) {
-          trackTokens(this.config.model, payload.usage.prompt_tokens ?? 0, payload.usage.completion_tokens ?? 0);
-        }
-
-        return payload.choices?.[0]?.message?.content ?? "";
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (lastError.name === "AbortError" || lastError instanceof TypeError) {
-          retryableFailure = true;
-        }
-
-        if (attempt < MAX_RETRY_ATTEMPTS && retryableFailure) {
-          await waitFor(addJitter(retryDelayMs));
-          continue;
-        }
-        throw lastError;
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-
-    throw lastError ?? new Error("Hyperbolic request failed unexpectedly.");
+class CohereProvider extends OpenAICompatibleProvider {
+  protected readonly label = "Cohere";
+  protected defaultEndpoint(): string {
+    return "https://api.cohere.com/v1/chat/completions";
   }
 }
 
-class GeminiProvider implements LLMProvider {
-  constructor(private config: GeminiConfig) {}
-
-  async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    const endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-    let lastError: Error | undefined;
-
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
-      let retryableFailure = false;
-      let retryDelayMs = 500 * 2 ** (attempt - 1);
-
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "authorization": `Bearer ${this.config.apiKey}`,
-          },
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: maxTokens,
-            temperature: 0.2,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: prompt },
-            ],
-          }),
-          signal: abortController.signal,
-        });
-
-        if (!response.ok) {
-          const retryAfterHeader = response.headers.get("retry-after");
-          const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-          if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-            retryDelayMs = Math.max(retryDelayMs, retryAfterSeconds * 1000);
-          }
-
-          const error = new Error(
-            `Gemini request failed with ${response.status}: ${await response.text()}`
-          );
-          retryableFailure = shouldRetry(response.status);
-          throw error;
-        }
-
-        const payload: {
-          choices?: Array<{ message?: { content?: string } }>;
-          usage?: { prompt_tokens?: number; completion_tokens?: number };
-        } = await response.json();
-
-        if (payload.usage) {
-          trackTokens(this.config.model, payload.usage.prompt_tokens ?? 0, payload.usage.completion_tokens ?? 0);
-        }
-
-        return payload.choices?.[0]?.message?.content ?? "";
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (lastError.name === "AbortError" || lastError instanceof TypeError) {
-          retryableFailure = true;
-        }
-
-        if (attempt < MAX_RETRY_ATTEMPTS && retryableFailure) {
-          await waitFor(addJitter(retryDelayMs));
-          continue;
-        }
-        throw lastError;
-      } finally {
-        clearTimeout(timeout);
-      }
-    }
-
-    throw lastError ?? new Error("Gemini request failed unexpectedly.");
+class PerplexityProvider extends OpenAICompatibleProvider {
+  protected readonly label = "Perplexity";
+  protected defaultEndpoint(): string {
+    return "https://api.perplexity.ai/chat/completions";
   }
 }
 
-class CustomProvider implements LLMProvider {
-  constructor(private config: CustomProviderConfig) {}
+class HyperbolicProvider extends OpenAICompatibleProvider {
+  protected readonly label = "Hyperbolic";
+  protected defaultEndpoint(): string {
+    return "https://api.hyperbolic.xyz/v1/chat/completions";
+  }
+}
 
-  async call(system: string, prompt: string, maxTokens = 4096): Promise<string> {
-    let lastError: Error | undefined;
+class GeminiProvider extends OpenAICompatibleProvider {
+  protected readonly label = "Gemini";
+  protected defaultEndpoint(): string {
+    return "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+  }
+}
 
-    for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt += 1) {
-      const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), DEFAULT_REQUEST_TIMEOUT_MS);
-      let retryableFailure = false;
-      let retryDelayMs = 500 * 2 ** (attempt - 1);
+class CustomProvider extends OpenAICompatibleProvider {
+  protected readonly label = "Custom provider";
 
-      try {
-        const headers: Record<string, string> = {
-          "content-type": "application/json",
-          ...this.config.headers,
-        };
+  constructor(private customConfig: CustomProviderConfig) {
+    super(customConfig);
+  }
 
-        if (!headers["authorization"] && !headers["Authorization"]) {
-          headers["authorization"] = `Bearer ${this.config.apiKey}`;
-        }
+  protected defaultEndpoint(): string {
+    return this.customConfig.baseURL;
+  }
 
-        const response = await fetch(resolveChatCompletionsEndpoint(this.config.baseURL), {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            model: this.config.model,
-            max_tokens: maxTokens,
-            temperature: 0.2,
-            messages: [
-              { role: "system", content: system },
-              { role: "user", content: prompt },
-            ],
-          }),
-          signal: abortController.signal,
-        });
+  protected buildHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      ...this.customConfig.headers,
+    };
+    if (!headers["authorization"] && !headers["Authorization"]) {
+      headers["authorization"] = `Bearer ${this.customConfig.apiKey}`;
+    }
+    return headers;
+  }
 
-        if (!response.ok) {
-          const retryAfterHeader = response.headers.get("retry-after");
-          const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
-          if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
-            retryDelayMs = Math.max(retryDelayMs, retryAfterSeconds * 1000);
-          }
+  protected parseText(payload: unknown): string {
+    const body = payload as ChatCompletionsPayload & {
+      content?: Array<{ type: string; text?: string }>;
+    };
+    trackChatCompletionsUsage(this.customConfig.model, body.usage);
 
-          const error = new Error(
-            `Custom provider request failed with ${response.status}: ${await response.text()}`
-          );
-          retryableFailure = shouldRetry(response.status);
-          throw error;
-        }
-
-        const payload: {
-          choices?: Array<{ message?: { content?: string } }>;
-          content?: Array<{ type: string; text?: string }>;
-          usage?: {
-            prompt_tokens?: number;
-            completion_tokens?: number;
-            input_tokens?: number;
-            output_tokens?: number;
-          };
-        } = await response.json();
-
-        if (payload.usage) {
-          const input = payload.usage.prompt_tokens ?? payload.usage.input_tokens ?? 0;
-          const output = payload.usage.completion_tokens ?? payload.usage.output_tokens ?? 0;
-          trackTokens(this.config.model, input, output);
-        }
-
-        // Try OpenAI-style response first
-        if (payload.choices?.[0]?.message?.content) {
-          return payload.choices[0].message.content;
-        }
-
-        // Try Anthropic-style response
-        if (payload.content) {
-          return payload.content
-            .filter(
-              (block): block is { type: string; text: string } =>
-                block.type === "text" && typeof block.text === "string"
-            )
-            .map((block) => block.text)
-            .join("");
-        }
-
-        throw new Error("Custom provider response format not recognized");
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (lastError.name === "AbortError" || lastError instanceof TypeError) {
-          retryableFailure = true;
-        }
-
-        if (attempt < MAX_RETRY_ATTEMPTS && retryableFailure) {
-          await waitFor(addJitter(retryDelayMs));
-          continue;
-        }
-        throw lastError;
-      } finally {
-        clearTimeout(timeout);
-      }
+    // Try OpenAI-style response first.
+    if (body.choices?.[0]?.message?.content) {
+      return body.choices[0].message.content;
     }
 
-    throw lastError ?? new Error("Custom provider request failed unexpectedly.");
+    // Fall back to Anthropic-style response.
+    if (body.content) {
+      return body.content
+        .filter((block): block is { type: string; text: string } => block.type === "text" && typeof block.text === "string")
+        .map((block) => block.text)
+        .join("");
+    }
+
+    throw new Error("Custom provider response format not recognized");
   }
 }
 

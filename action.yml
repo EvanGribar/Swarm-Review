@@ -1,6 +1,9 @@
 name: swarm-review
 description: Run a swarm of AI reviewers on pull requests with multi-provider support (Anthropic, OpenAI, OpenRouter, custom).
 author: EvanGribar
+branding:
+  icon: users
+  color: blue
 inputs:
   github-token:
     description: GitHub token with permission to comment on pull requests.
@@ -65,5 +68,5 @@ outputs:
   not-verifiable-count:
     description: Number of criteria that could not be verified.
 runs:
-  using: node20
+  using: node24
   main: dist/index.js

@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 
-import { getModelCostRates } from "./providers.js";
+import { getModelCostRates, registerCustomModelPrices } from "./providers.js";
 import type { BudgetConfig, ProviderConfig } from "./types.js";
 
 export class BudgetExceededError extends Error {
@@ -39,6 +39,9 @@ export function configureBudget(config: BudgetConfig | undefined): void {
   budgetState.committedUpperBoundUsd = 0;
   budgetState.fallbackCalls = 0;
   budgetState.skippedCalls = 0;
+  if (config?.model_prices) {
+    registerCustomModelPrices(config.model_prices);
+  }
 }
 
 export function getBudgetStatus(): Readonly<BudgetState> & { exhausted: boolean } {

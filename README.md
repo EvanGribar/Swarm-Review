@@ -1,19 +1,34 @@
-# swarm-review
+# Swarm Review
 
-swarm-review is a GitHub Action for **independent specialist review, evidence-aware synthesis, and optional requirement validation**.
+[![ci](https://github.com/EvanGribar/Swarm-Review/actions/workflows/ci.yml/badge.svg)](https://github.com/EvanGribar/Swarm-Review/actions/workflows/ci.yml)
+[![Marketplace](https://img.shields.io/badge/marketplace-swarm--review-blue)](https://github.com/marketplace/actions/swarm-review)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+## AI code review without trusting one model's opinion
+
+Swarm Review is a GitHub Action that runs independent specialist reviewers against each pull request, then asks a principal reviewer to resolve disagreements and publish one actionable result.
+
+```yaml
+- uses: EvanGribar/Swarm-Review@v1
+```
 
 Requirement-aware review is supported via [SpecBridge integration](docs/SPECBRIDGE.md) for contract configuration, coverage artifacts, SARIF consumption, and merge-gate behavior.
 
-Each configured agent reads the diff independently and flags domain-specific issues. A principal agent synthesizes all findings into a clear, actionable engineering review. Structured debate rounds remain available as an opt-in feature for complex or high-risk pull requests.
+## Why Swarm Review
 
-## Why it exists
+- **Multiple independent reviews** across security, performance, architecture, or your own domains.
+- **One synthesized answer** instead of a pile of unrelated model opinions.
+- **Bring your own model** with provider support and hard per-run spending limits.
+- **Optional requirement validation** against a checked-in `.specbridge/requirements.json` contract.
 
-Most AI review tools give you a single uncoordinated opinion. swarm-review gives you an evidence-backed review process.
+## See it in action
 
-- **Specialized Independent Review**: Different agents specialize in security, performance, architecture, or custom domains.
-- **Evidence-Aware Principal Synthesis**: A principal engineering agent synthesizes findings, eliminates false positives, and makes final calls.
-- **Optional Requirement Validation**: Validate pull requests directly against `.specbridge/requirements.json` contracts.
-- **Evaluation-Backed Efficiency**: Default non-debate mode eliminates unnecessary LLM calls, saving cost and latency.
+```text
+## swarm-review
+
+security flagged src/api/users.ts:47 - raw user input is passed into query construction.
+principal: blocking until this path uses parameterized queries.
+```
 
 ## How it works
 
@@ -24,11 +39,11 @@ Most AI review tools give you a single uncoordinated opinion. swarm-review gives
 5. If debate is explicitly enabled (`debate.enabled: true` or `debate.rounds > 0`), agents engage in structured rebuttal rounds before principal synthesis.
 6. The action updates the PR comment and, optionally, the check run.
 
-## Evaluation & Architecture Benchmarks
+## Evaluated, not just demoed
 
 Swarm-Review's multi-agent debate architecture has been empirically benchmarked against [SpecBench v0.2](https://github.com/EvanGribar/SpecBench) across 5 distinct review configurations (Single-Agent, Swarm without Debate, Swarm with Debate, Swarm Debate + Static Analysis, and Requirement-Aware SpecBridge).
 
-Key measured findings:
+On a controlled 10-case requirement-violation benchmark, independent reviewers plus principal synthesis matched the debate configuration while reducing cost and latency. The benchmark is directional evidence, not a claim of general code-review quality; see the full methodology and raw results:
 - **Principal Synthesis Sufficiency**: Independent reviewers plus principal synthesis (`swarm-no-debate`) achieves **100.0% Recall** and **100.0% Precision** on SpecBench v0.2 requirement violation cases. Principal synthesis alone filters false positives without requiring multi-agent debate rounds.
 - **Debate Cost & Latency Penalty**: Structured debate (`swarm-with-debate`) achieves identical 100% precision and recall as non-debate swarm, while adding **+26.2% cost** ($0.0077 vs $0.0061) and **+38.1% runtime latency** (116.4s vs 84.3s).
 - **SpecBridge Requirement Efficiency**: Contract-aware SpecBridge evaluation delivers **98.4% F1** at **22% of the cost** ($0.0017 vs $0.0077) and **27% of the latency** (31.9s vs 116.4s).
@@ -215,8 +230,9 @@ principal: blocking until this path uses parameterized queries.
   - `agents[].include_patterns`: glob patterns of files this agent should review.
   - `agents[].exclude_patterns`: glob patterns of files this agent should ignore.
 - `budget.max_cost_usd`: optional strict per-run spend cap. Before every call, swarm-review reserves a conservative worst-case cost and never starts a call that would exceed the cap. Successful calls settle to an observed-output upper bound; failed or ambiguous calls retain their reservation because they may still be billable.
-- `budget.fallback_model`: optional cheaper model from the same provider to use when the primary model no longer fits. Models without known pricing require a known fallback when budgeting is enabled.
+- `budget.fallback_model`: optional cheaper model from the same provider to use when the primary model no longer fits. Models without known pricing need either a known fallback or a `budget.model_prices` entry when budgeting is enabled.
 - `budget.max_output_tokens`: maximum output tokens reserved and requested per call. Defaults to `4096`.
+- `budget.model_prices`: optional per-model prices (USD per 1M input/output tokens) for models without known pricing, e.g. self-hosted gateways or brand-new model IDs. Example: `model_prices: { my-model: { input: 1.0, output: 3.0 } }`.
 - `debate.rounds`: how many debate rounds to run after the first-pass review.
 - `debate.min_confidence`: findings below this threshold are filtered out.
 - `principal.mandate`: instructions for the synthesis agent.
