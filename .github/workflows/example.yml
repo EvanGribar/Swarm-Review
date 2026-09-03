@@ -9,7 +9,9 @@ on:
 permissions:
   contents: read
   pull-requests: write
-  checks: write
+  # Add `checks: write` here only if you pass `check-run-id` to the action.
+  # It is intentionally omitted so the default workflow follows least privilege
+  # (see Scorecard Token-Permissions).
 
 jobs:
   review:
