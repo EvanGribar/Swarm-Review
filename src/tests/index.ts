@@ -12,6 +12,7 @@ import "./llm.test.js";
 import "./metadata.test.js";
 import "./prompts.test.js";
 import "./providers.test.js";
+import "./redact.test.js";
 import "./static_analysis.test.js";
 import "./requirements.test.js";
 import "./specbridge-offline-validation.test.js";

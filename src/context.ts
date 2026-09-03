@@ -89,11 +89,13 @@ export function resolvePathAlias(
     for (const pattern of Object.keys(paths)) {
       const targets = paths[pattern];
       if (pattern.includes("*")) {
-        const prefix = pattern.replace("*", "");
+        // Replace every wildcard so multi-"*" patterns cannot slip through
+        // partially substituted (tsconfig allows at most one, but be strict).
+        const prefix = pattern.replaceAll("*", "");
         if (importSpecifier.startsWith(prefix)) {
           const suffix = importSpecifier.slice(prefix.length);
           for (const target of targets) {
-            const resolvedRel = target.replace("*", suffix);
+            const resolvedRel = target.replaceAll("*", suffix);
             const base = baseUrl ? path.resolve(workspaceRoot, baseUrl) : workspaceRoot;
             resolvedCandidates.push(path.resolve(base, resolvedRel));
           }
