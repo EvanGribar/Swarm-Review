@@ -31,11 +31,11 @@ If **Context Enrichment** is enabled, import dependencies in changed files are r
 
 If **SpecBridge Requirement Evaluation** is enabled, checked-in `.specbridge/requirements.json` contracts are evaluated against the PR patch, generating structured `coverage.json` and `findings.sarif` artifacts.
 
-### Stage 2 — evidence-aware principal synthesis (default)
-A principal engineer agent receives all independent reviewer findings (along with optional static analysis and requirement evaluation results) and synthesizes the final PR review summary. The principal eliminates false positives, resolves overlaps, and makes final calls.
-
-### Stage 3 — optional structured debate (opt-in)
+### Stage 2 — optional structured debate (opt-in)
 When debate is explicitly enabled (`debate.enabled: true` or `debate.rounds > 0`), agents engage in structured rebuttal rounds before principal synthesis, receiving full transcript history to challenge or reinforce claims.
+
+### Stage 3 — evidence-aware principal synthesis (default)
+A principal engineer agent receives all independent reviewer findings (along with optional static analysis and requirement evaluation results) and synthesizes the final PR review summary. The principal eliminates false positives, resolves overlaps, and makes final calls.
 
 ---
 
@@ -66,12 +66,16 @@ type AgentConfig = {
   name: string
   mandate: string         // plain English description of what this agent looks for
   model?: string          // optional model override per agent
+  system_prompt?: string  // extra reviewer instructions (appended to the built-in prompt)
+  min_confidence?: number // per-agent confidence threshold (defaults to debate.min_confidence)
+  include_patterns?: string[] // files this agent reviews (globs)
+  exclude_patterns?: string[] // files this agent ignores (globs)
 }
 
 type PrincipalSummary = {
   agreements: Finding[]
   disputes: { finding: Finding; rebuttal: Finding }[]
-  final_calls: { finding: Finding; decision: string }[]
+  final_calls: { finding: Finding; decision: string; status?: "accepted" | "rejected" | "deferred" }[]
   summary: string         // the markdown block posted to GitHub
 }
 ```
@@ -105,7 +109,7 @@ agents:
       unclear variable names, and changes that will be hard to maintain.
 
 debate:
-  rounds: 2               # how many debate rounds before synthesis
+  rounds: 0               # opt-in only: enabled: true or rounds: 1 for complex/high-risk PRs
   min_confidence: 0.6     # findings below this threshold are soft-filtered
 
 principal:
@@ -114,7 +118,7 @@ principal:
     Be direct. Show your reasoning. Surface genuine disagreements clearly.
 
 static_analysis:
-  enabled: true
+  enabled: false          # opt-in: runs shell commands from this file
   commands:
     - name: eslint
       run: npx eslint --format json -o eslint-report.json
@@ -136,8 +140,8 @@ context_enrichment:
 ## Tech stack
 
 - **Language:** TypeScript
-- **Runtime:** GitHub Actions (`runs-on: ubuntu-latest`)
-- **AI:** Anthropic API (user supplies `ANTHROPIC_API_KEY` as repo secret)
+- **Runtime:** GitHub Actions, node24 (`action.yml`) on `ubuntu-latest`
+- **AI:** 13 providers through a shared OpenAI-compatible base class (default Anthropic; user supplies the provider API key as a repo secret)
 - **GitHub API:** Octokit for reading diffs and posting comments
 - **Parallelism:** `Promise.all` for round 1, sequential per debate round
 - **Schema validation:** Zod for all agent outputs
@@ -153,13 +157,24 @@ swarm-review/
 │   └── workflows/
 │       └── example.yml       # example workflow for users to copy
 ├── src/
-│   ├── types.ts              # Finding, DebateTranscript, AgentConfig, PrincipalSummary
-│   ├── config.ts             # parse and validate .swarm.yml
+│   ├── types.ts              # Finding, DebateTranscript, AgentConfig, PrincipalSummary, all Zod schemas
+│   ├── config.ts             # parse and validate .swarm.yml (+ presets)
 │   ├── diff.ts               # fetch and parse the PR diff via Octokit
+│   ├── providers.ts          # LLM providers behind one retry/timeout interface
+│   ├── budget.ts             # strict per-run spend caps with fallback models
+│   ├── llm.ts                # structured-output calls with validation + retry
+│   ├── context.ts            # import tracing + signature extraction for prompts
+│   ├── static_analysis.ts    # linter/compiler execution with caps + containment
+│   ├── requirements.ts       # SpecBridge contract loading, coverage, SARIF
+│   ├── events.ts             # re-review commands, trust + fork detection
+│   ├── format.ts             # comment rendering, sanitization helpers
+│   ├── redact.ts             # secret masking for logs and posted comments
 │   ├── agents/
+│   │   ├── shared.ts         # per-agent provider resolution + finding rounds
 │   │   ├── review.ts         # round 1 — run all agents in parallel
-│   │   ├── debate.ts         # round 2 — run debate rounds
-│   │   └── principal.ts      # round 3 — synthesize and post comment
+│   │   ├── debate.ts         # round 2 — opt-in debate rounds
+│   │   ├── requirements.ts   # requirement-aware evaluation
+│   │   └── principal.ts      # round 3 — synthesize (with budget-exhaustion fallback)
 │   ├── prompts.ts            # all prompt templates in one place
 │   ├── github.ts             # post comment, update check run
 │   └── index.ts              # entrypoint, orchestrates the three rounds
@@ -178,13 +193,18 @@ Build in this order. Do not skip ahead.
 1. `src/types.ts` — define all types and Zod schemas. Nothing else until this is solid.
 2. `src/config.ts` — parse `.swarm.yml`, validate against schema, export `SwarmConfig`
 3. `src/diff.ts` — fetch PR diff from GitHub API, return as structured `FileDiff[]`
-4. `src/prompts.ts` — write all prompt templates. Keep prompts centralized, never inline.
-5. `src/agents/review.ts` — round 1. Run all agents in parallel, collect `Finding[]`
-6. `src/agents/debate.ts` — round 2. Run debate rounds, build `DebateTranscript`
-7. `src/agents/principal.ts` — round 3. Synthesize, format, post GitHub comment
-8. `src/index.ts` — wire everything together
-9. `action.yml` — package as GitHub Action
-10. `README.md` — write last, when the thing actually works
+4. `src/providers.ts` + `src/budget.ts` — provider interface with retries, spend caps
+5. `src/prompts.ts` — write all prompt templates. Keep prompts centralized, never inline.
+6. `src/llm.ts` + `src/agents/shared.ts` — structured calls, per-agent rounds
+7. `src/agents/review.ts` — round 1. Run all agents in parallel, collect `Finding[]`
+8. `src/static_analysis.ts` + `src/context.ts` — local signals and codebase context
+9. `src/agents/debate.ts` — round 2 (opt-in). Run debate rounds, build `DebateTranscript`
+10. `src/requirements.ts` + `src/agents/requirements.ts` — SpecBridge evaluation
+11. `src/agents/principal.ts` + `src/format.ts` + `src/redact.ts` — synthesize, sanitize, render
+12. `src/events.ts` + `src/github.ts` — commands, trust checks, posting
+13. `src/index.ts` — wire everything together
+14. `action.yml` — package as GitHub Action
+15. `README.md` — write last, when the thing actually works
 
 ---
 
@@ -239,7 +259,7 @@ That output. That is the goal. Every implementation decision should serve produc
 
 ## Roadmap
 
-The strategic development goals and future milestones are documented in [ROADMAP.md](file:///c:/Users/evang/Documents/Coding/Swarm-Review/ROADMAP.md).
+The strategic development goals and future milestones are documented in [ROADMAP.md](ROADMAP.md).
 
 > [!IMPORTANT]
 > **Rule for Future AI Agents:**

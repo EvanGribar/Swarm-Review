@@ -1,5 +1,5 @@
 name: swarm-review
-description: Run a swarm of AI reviewers on pull requests with multi-provider support (Anthropic, OpenAI, OpenRouter, custom).
+description: Run a swarm of AI reviewers on pull requests with multi-provider support (Anthropic, OpenAI, OpenRouter, OpenClaw, Hermes, Groq, Together, Mistral, Cohere, Perplexity, Hyperbolic, Gemini, custom).
 author: EvanGribar
 branding:
   icon: users

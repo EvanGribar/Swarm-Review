@@ -1,6 +1,6 @@
 # SpecBridge requirement-aware review
 
-Swarm-Review v1.1 can evaluate a checked-in [SpecBridge](https://github.com/EvanGribar/SpecBridge) `1.0` contract. It is opt-in; without `requirements.enabled: true`, existing review behavior is unchanged.
+Swarm-Review (requirement-aware review introduced in v1.1) can evaluate a checked-in [SpecBridge](https://github.com/EvanGribar/SpecBridge) `1.0` contract. It is opt-in; without `requirements.enabled: true`, existing review behavior is unchanged.
 
 ```yaml
 requirements:
@@ -15,7 +15,7 @@ Only a repository-relative local JSON path is supported. The loader rejects abso
 Every criterion becomes exactly one `satisfied`, `violated`, `not_verifiable`, or `not_applicable` record. Violations require source-code evidence; budget exhaustion becomes `not_verifiable`. `swarm-review-output/coverage.json` is the source of truth and `swarm-review-output/findings.sarif` is generated from it with `@specbridge/sarif`; only evidenced violations appear in SARIF.
 
 ```yaml
-- uses: github/codeql-action/upload-sarif@v3
+- uses: github/codeql-action/upload-sarif@v4
   with:
     sarif_file: swarm-review-output/findings.sarif
 ```
