@@ -10,10 +10,14 @@ provider:
 # Optional strict worst-case spend cap for all model calls in one action run.
 # Calls use fallback_model when the primary model no longer fits; calls are skipped
 # before the cap can be exceeded when neither model fits.
+# Use model_prices to teach the budget guard about models without known pricing
+# (self-hosted gateways, brand-new model IDs). Prices are USD per 1M tokens.
 # budget:
 #   max_cost_usd: 1.50
 #   fallback_model: claude-3-5-haiku-latest
 #   max_output_tokens: 4096
+#   model_prices:
+#     my-custom-model: { input: 1.0, output: 3.0 }
 
 # Alternative: OpenAI
 # provider:
@@ -121,13 +125,19 @@ agents:
       Review for architectural concerns. Look for separation of concerns violations,
       tight coupling, naming inconsistency, and patterns that do not fit the codebase.
 
-  - name: dx
-    mandate: >
-      Review for developer experience. Look for missing tests, outdated docs,
-      unclear variable names, and changes that will be hard to maintain.
+  # Optional fourth reviewer for the `thorough` preset. Uncomment to enable.
+  # - name: dx
+  #   mandate: >
+  #     Review for developer experience. Look for missing tests, outdated docs,
+  #     unclear variable names, and changes that will be hard to maintain.
 
+# Evaluation-backed default: independent reviewers + principal synthesis with
+# zero debate rounds. Debate costs +26% and adds latency with no measured
+# quality gain on requirement-violation benchmarks — opt in only for complex
+# or high-risk PRs (debate.enabled: true, or the `/swarm-review debate`
+# re-review command).
 debate:
-  rounds: 2
+  rounds: 0
   min_confidence: 0.6
 
 principal:

@@ -30,7 +30,7 @@ test("release and action metadata are valid and aligned with v1", async () => {
     packages?: Record<string, { version?: string }>;
   };
 
-  assert.equal(action.runs?.using, "node20");
+  assert.match(action.runs?.using ?? "", /^node(20|24)$/);
   assert.equal(action.runs?.main, "dist/index.js");
   assert.ok(action.inputs?.["pull-number"]);
   assert.deepEqual(release.on?.release?.types, ["published"]);

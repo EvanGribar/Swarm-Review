@@ -232,6 +232,12 @@ export const BudgetConfigSchema = z.object({
   max_cost_usd: z.number().positive(),
   fallback_model: z.string().min(1).optional(),
   max_output_tokens: z.number().int().positive().max(32_768).default(4_096),
+  // Optional per-model prices (USD per 1M tokens) for models without known
+  // pricing. Lets strict budget caps admit self-hosted or brand-new models.
+  model_prices: z.record(z.object({
+    input: z.number().nonnegative(),
+    output: z.number().nonnegative(),
+  })).optional(),
 });
 
 export const RequirementsConfigSchema = z.object({

@@ -163,3 +163,60 @@ test("calculateEstimatedCost flags unknown models", () => {
   assert.equal(cost, 0);
   assert.equal(hasUnknown, true);
 });
+
+test("openai-compatible providers share retry behavior and bearer auth", async (t) => {
+  const { callLLM } = await import("../llm.js");
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  let attempts = 0;
+  let authHeader = "";
+  globalThis.fetch = (async (_url, init) => {
+    attempts += 1;
+    authHeader = (init?.headers as Record<string, string>)["authorization"] ?? "";
+    if (attempts === 1) {
+      return new Response("busy", { status: 429 });
+    }
+    return new Response(
+      JSON.stringify({ choices: [{ message: { content: "[]" } }], usage: { prompt_tokens: 10, completion_tokens: 5 } }),
+      { status: 200 }
+    );
+  }) as typeof fetch;
+
+  resetTokenTracker();
+  const response = await callLLM(
+    { type: "groq", config: { apiKey: "groq-key", model: "llama-3.3-70b-versatile" } },
+    "system",
+    "prompt"
+  );
+
+  assert.equal(response, "[]");
+  assert.equal(attempts, 2);
+  assert.equal(authHeader, "Bearer groq-key");
+  assert.equal(tokenTracker.models["llama-3.3-70b-versatile"]?.calls, 1);
+});
+
+test("openrouter provider sends attribution headers", async (t) => {
+  const { callLLM } = await import("../llm.js");
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  let sentHeaders: Record<string, string> = {};
+  globalThis.fetch = (async (_url, init) => {
+    sentHeaders = (init?.headers ?? {}) as Record<string, string>;
+    return new Response(JSON.stringify({ choices: [{ message: { content: "[]" } }] }), { status: 200 });
+  }) as typeof fetch;
+
+  await callLLM(
+    { type: "openrouter", config: { apiKey: "or-key", model: "anthropic/claude-3.5-sonnet" } },
+    "system",
+    "prompt"
+  );
+
+  assert.equal(sentHeaders["HTTP-Referer"], "https://github.com/EvanGribar/Swarm-Review");
+  assert.equal(sentHeaders["X-Title"], "Swarm Review");
+});
