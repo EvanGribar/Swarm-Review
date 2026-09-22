@@ -9,6 +9,20 @@ All notable changes to this project are documented in this file.
 * Migrate the opt-in requirement review integration to the consolidated SpecBridge Core and SARIF packages.
 * Remove the former source-submodule and local SARIF bridge dependency; the action now pins public release tarballs and bundles them during release.
 
+## [1.4.0](https://github.com/EvanGribar/Swarm-Review/compare/swarm-review-v1.3.0...swarm-review-v1.4.0) (2026-09-03)
+
+
+### Features
+
+* consume consolidated SpecBridge packages ([#72](https://github.com/EvanGribar/Swarm-Review/issues/72)) ([ff16a40](https://github.com/EvanGribar/Swarm-Review/commit/ff16a40c25b20559e2ad0c737b76f78b891480e3))
+
+
+### Bug Fixes
+
+* **correctness:** audit batch - yaml guard, line numbers, schemas, cleanups ([#89](https://github.com/EvanGribar/Swarm-Review/issues/89)) ([7fb1de5](https://github.com/EvanGribar/Swarm-Review/commit/7fb1de5c5281f12d91db1964e441df4bc34c0a84))
+* **security:** fork-gated static analysis, output containment, comment redaction ([#88](https://github.com/EvanGribar/Swarm-Review/issues/88)) ([b7b1de2](https://github.com/EvanGribar/Swarm-Review/commit/b7b1de24fd228cd9d2f795ac6e966e297506881f))
+* **security:** redact secrets from fatal log, global wildcard replacement ([#87](https://github.com/EvanGribar/Swarm-Review/issues/87)) ([9d3fcf6](https://github.com/EvanGribar/Swarm-Review/commit/9d3fcf67bf1a8e44c9d4537504966245ea73daee))
+
 ## [1.3.0](https://github.com/EvanGribar/Swarm-Review/compare/swarm-review-v1.2.0...swarm-review-v1.3.0) (2026-07-26)
 
 
