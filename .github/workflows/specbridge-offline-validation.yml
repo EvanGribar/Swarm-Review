@@ -29,7 +29,7 @@ jobs:
       - run: npm run validation:specbridge
       - run: |
           node -e "const fs=require('node:fs'); const c=JSON.parse(fs.readFileSync('offline-specbridge-validation-output/swarm-review-output/coverage.json')); const s=JSON.parse(fs.readFileSync('offline-specbridge-validation-output/swarm-review-output/findings.sarif')); if (c.requirements[0].criteria.map(x=>x.status).join(',') !== 'satisfied,violated,not_verifiable' || s.runs[0].results.length !== 1) process.exit(1)"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: specbridge-offline-validation
           retention-days: 14
