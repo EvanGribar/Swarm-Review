@@ -1,5 +1,7 @@
 # Swarm Review
 
+> **Project status: retired (November 2026).** This repository is preserved as a record of an experimental GitHub Action; it is no longer actively developed or supported. Fresh installation is currently broken because a pinned SpecBridge release asset is inaccessible (see [issue #116](https://github.com/EvanGribar/Swarm-Review/issues/116)). Do not rely on this action for new or production use.
+
 [![ci](https://github.com/EvanGribar/Swarm-Review/actions/workflows/ci.yml/badge.svg)](https://github.com/EvanGribar/Swarm-Review/actions/workflows/ci.yml)
 [![Marketplace](https://img.shields.io/badge/marketplace-swarm--review-blue)](https://github.com/marketplace/actions/swarm-review)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
