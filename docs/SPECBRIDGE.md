@@ -1,6 +1,6 @@
 # SpecBridge requirement-aware review
 
-Swarm-Review (requirement-aware review introduced in v1.1) can evaluate a checked-in [SpecBridge](https://github.com/EvanGribar/SpecBridge) `1.0` contract. It is opt-in; without `requirements.enabled: true`, existing review behavior is unchanged.
+Swarm-Review (requirement-aware review introduced in v1.1) can evaluate a checked-in SpecBridge `1.0` contract. It is opt-in; without `requirements.enabled: true`, existing review behavior is unchanged.
 
 ```yaml
 requirements:
@@ -20,4 +20,4 @@ Every criterion becomes exactly one `satisfied`, `violated`, `not_verifiable`, o
     sarif_file: swarm-review-output/findings.sarif
 ```
 
-The action exposes `coverage-path`, `sarif-path`, `requirement-count`, `violated-count`, and `not-verifiable-count`. `fail_on_violation: true` requests changes only for evidenced blocking violations. Swarm Review consumes the released `@specbridge/core` and `@specbridge/sarif` tarballs pinned in `package.json`; there is no source submodule or local package bridge. The action bundle contains the canonical core validator and SARIF converter. Historical SpecBench evaluation references remain for provenance; the benchmark runtime now lives in SpecBridge.
+The action exposes `coverage-path`, `sarif-path`, `requirement-count`, `violated-count`, and `not-verifiable-count`. `fail_on_violation: true` requests changes only for evidenced blocking violations. Swarm Review consumes the released `@specbridge/core` and `@specbridge/sarif` tarballs pinned in `package.json`; there is no source submodule or local package bridge. The action bundle contains the canonical core validator and SARIF converter. The historical evaluation is preserved in this repository's [methodology](EVALUATION.md) and [raw artifacts](../artifacts/evaluation/). The upstream SpecBridge repository and release tarballs are separate dependencies; check their accessibility before attempting a clean install.
